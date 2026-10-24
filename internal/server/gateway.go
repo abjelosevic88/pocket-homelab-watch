@@ -29,9 +29,10 @@ import (
 // watched marks and favourites, and the library scan.
 
 var (
-	gatewayRead = regexp.MustCompile(`^/(Users|Items|Videos|Audio|Shows|Sessions|System/Info|UserItems|UserViews|UserPlayedItems|UserFavoriteItems|Playback|MediaSegments|Persons|Genres|Studios|Artists|Search|Movies|Trailers|ScheduledTasks)(/|$)`)
-	// writes a player makes; nothing that changes users, policies or the server
-	gatewayWrite = regexp.MustCompile(`^/(UserItems/[^/]+/UserData|UserPlayedItems/[^/]+|UserFavoriteItems/[^/]+|Users/[^/]+/(PlayedItems|FavoriteItems|PlayingItems)/[^/]+(/[^/]+)?|Items/[^/]+/PlaybackInfo|Sessions/Playing(/Progress|/Stopped|/Ping)?|Videos/ActiveEncodings|Library/Refresh)$`)
+	gatewayRead = regexp.MustCompile(`(?i)^/(Users|Items|Videos|Audio|Shows|Sessions|System/Info|UserItems|UserViews|UserPlayedItems|UserFavoriteItems|Playback|MediaSegments|Persons|Genres|Studios|Artists|Search|Movies|Trailers|ScheduledTasks)(/|$)`)
+	// writes a player makes; nothing that changes users, policies or the server.
+	// Case-insensitive like Jellyfin: its own transcoding URLs are /videos/…/master.m3u8.
+	gatewayWrite = regexp.MustCompile(`(?i)^/(UserItems/[^/]+/UserData|UserPlayedItems/[^/]+|UserFavoriteItems/[^/]+|Users/[^/]+/(PlayedItems|FavoriteItems|PlayingItems)/[^/]+(/[^/]+)?|Items/[^/]+/PlaybackInfo|Sessions/Playing(/Progress|/Stopped|/Ping)?|Videos/ActiveEncodings|Library/Refresh)$`)
 	// how Jellyfin clients pass a token in a header
 	mediaBrowserToken = regexp.MustCompile(`(?i)\btoken=(?:"([^"]*)"|([^,\s"]+))`)
 )
@@ -108,8 +109,8 @@ func (s *Server) handleGateway(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// The person's own account, never the household's list.
-	if read && (path == "/Users" || path == "/Users/Me") {
-		s.gatewaySelf(w, r, jc, path == "/Users")
+	if read && (strings.EqualFold(path, "/Users") || strings.EqualFold(path, "/Users/Me")) {
+		s.gatewaySelf(w, r, jc, strings.EqualFold(path, "/Users"))
 		return
 	}
 	q := r.URL.Query()
