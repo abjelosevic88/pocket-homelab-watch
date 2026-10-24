@@ -141,5 +141,9 @@ type Settings struct {
 	RadarrURL      string `json:"radarr_url"`
 	RadarrKey      string `json:"radarr_key"`
 	MaintainerrURL string `json:"maintainerr_url"`
-	SubtitlesURL   string `json:"subtitles_url"`
+	SubtitlesURL   string `json:"subtitles_url"` // public: the nudge page link
+	// Saving subtitle timing into the file: core (a link, as the person) | direct (this token) | off; "" = direct when a token is set, else core.
+	SubtitlesMode   string `json:"subtitles_mode"`
+	SubtitlesAPIURL string `json:"subtitles_api_url"`
+	SubtitlesToken  string `json:"subtitles_token"`
 }

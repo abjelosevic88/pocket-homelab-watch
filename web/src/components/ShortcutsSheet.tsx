@@ -3,7 +3,7 @@ import { Modal } from './ui'
 const GROUPS: { title: string; keys: [string[], string][] }[] = [
   { title: 'Go to', keys: [[['h'], 'Home'], [['f'], 'Films'], [['s'], 'Shows'], [['l'], 'Watchlist'], [['u'], 'Upcoming'], [['d'], 'Discover'], [['r'], 'Requests'], [['y'], 'History'], [['t'], 'Stats'], [[','], 'Settings']] },
   { title: 'Find', keys: [[['/'], 'Search & commands'], [['⌘', 'K'], 'Search & commands'], [['w'], 'What should we watch?'], [['['], 'Show or hide the sidebar'], [['?'], 'This sheet']] },
-  { title: 'Playing', keys: [[['space'], 'Play / pause'], [['k'], 'Play / pause'], [['←', '→'], 'Back / forward 10 s'], [['j', 'l'], 'Back / forward 10 s'], [['↑', '↓'], 'Volume'], [['m'], 'Mute'], [['f'], 'Full screen'], [['c'], 'Subtitles on / off'], [['⇧', 'N'], 'Next episode'], [['esc'], 'Back to the page']] },
+  { title: 'Playing', keys: [[['space'], 'Play / pause'], [['k'], 'Play / pause'], [['←', '→'], 'Back / forward 10 s'], [['j', 'l'], 'Back / forward 10 s'], [['↑', '↓'], 'Volume'], [['m'], 'Mute'], [['f'], 'Full screen'], [['c'], 'Subtitles on / off'], [['g', 'h'], 'Subtitles earlier / later (0.1 s)'], [['⇧', 'N'], 'Next episode'], [['esc'], 'Back to the page']] },
 ]
 
 export function ShortcutsSheet({ onClose }: { onClose: () => void }) {

@@ -145,6 +145,8 @@ func (s *Server) seedBox(ctx context.Context) error {
 	set("radarr_key", &st.RadarrKey, s.cfg.RadarrKey)
 	set("maintainerr_url", &st.MaintainerrURL, s.cfg.MaintainerrURL)
 	set("subtitles_url", &st.SubtitlesURL, s.cfg.SubtitlesPublicURL)
+	set("subtitles_api_url", &st.SubtitlesAPIURL, s.cfg.SubtitlesURL)
+	set("subtitles_token", &st.SubtitlesToken, s.cfg.SubtitlesToken)
 	if changed {
 		return s.store.SaveBoxSettings(ctx, st)
 	}
@@ -351,7 +353,8 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "WATCH",
 		Publishes: eventTopics,
 		Offers:    linkOffers,
-		Uses:      []core.Use{core.InferenceUse()},
+		Uses: []core.Use{core.InferenceUse(),
+			{App: "subtitles", Scopes: []string{"subtitles:sync"}, Reason: "Save a subtitle's timing into the file when you fix it while watching, so everyone gets it"}},
 		Services: []core.ServiceUse{
 			{Type: "jellyfin", Reason: "Your films and shows: Pocket Watch plays them with your own Jellyfin account, so resume points and watched marks stay yours"},
 		},

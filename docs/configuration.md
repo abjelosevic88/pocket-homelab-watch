@@ -56,7 +56,8 @@ them once). Pocket Watch only ever acts as each person: requests go in as their 
 | `SONARR_URL` / `SONARR_API_KEY` | – | Upcoming episodes (only the calendar is read) |
 | `RADARR_URL` / `RADARR_API_KEY` | – | Upcoming films: cinema, digital and disc releases |
 | `MAINTAINERR_URL` | – | "Leaving soon": titles a Maintainerr collection will remove, with the day |
-| `SUBTITLES_PUBLIC_URL` | – | [Pocket Subtitles](https://github.com/abjelosevic88/pocket-homelab-subtitles): admins get "Out of sync?" in the player, opening its nudge page for that title |
+| `SUBTITLES_URL` / `SUBTITLES_API_TOKEN` | – | [Pocket Subtitles](https://github.com/abjelosevic88/pocket-homelab-subtitles)' API and a token from it: the player saves a subtitle's timing into the .srt for everyone. Without a token, Watch goes through Pocket Core as each person (app link `subtitles:sync`, switched on in Core → Links). Settings → Services can choose. |
+| `SUBTITLES_PUBLIC_URL` | – | Pocket Subtitles' address in a browser: admins get a link to the file from the player |
 
 ## Personal integrations
 

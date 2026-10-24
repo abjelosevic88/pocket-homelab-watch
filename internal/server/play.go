@@ -172,6 +172,8 @@ type streamOut struct {
 	External bool   `json:"external,omitempty"`
 	Text     bool   `json:"text"`
 	URL      string `json:"url,omitempty"`
+	Offset   int    `json:"offset_ms,omitempty"` // the person's timing for this track
+	File     bool   `json:"file,omitempty"`      // an .srt Pocket Subtitles can save the timing into
 }
 
 var hexID = regexp.MustCompile(`^[0-9a-fA-F-]{32,36}$`)
@@ -292,12 +294,14 @@ func (s *Server) handlePlay(w http.ResponseWriter, r *http.Request) {
 	out["method"] = method
 	// streams to choose from
 	var audios, subs []streamOut
+	offsets := s.store.SubtitleOffsets(ctx, u.ID, id)
 	for _, x := range src.MediaStreams {
 		switch x.Type {
 		case "Audio":
 			audios = append(audios, streamOut{Index: x.Index, Label: firstNonEmpty(x.DisplayTitle, x.Title, x.Language, "Track "+strconv.Itoa(x.Index)), Lang: x.Language, Codec: x.Codec, Channels: x.Channels, Default: x.IsDefault})
 		case "Subtitle":
-			so := streamOut{Index: x.Index, Label: firstNonEmpty(x.DisplayTitle, x.Title, x.Language, "Subtitles "+strconv.Itoa(x.Index)), Lang: x.Language, Codec: x.Codec, Default: x.IsDefault, Forced: x.IsForced, External: x.IsExternal, Text: x.IsTextSubtitleStream}
+			so := streamOut{Index: x.Index, Label: firstNonEmpty(x.DisplayTitle, x.Title, x.Language, "Subtitles "+strconv.Itoa(x.Index)), Lang: x.Language, Codec: x.Codec, Default: x.IsDefault, Forced: x.IsForced, External: x.IsExternal, Text: x.IsTextSubtitleStream,
+				Offset: offsets[x.Index], File: fileTrack(&x)}
 			if x.IsTextSubtitleStream {
 				so.URL = "/api/v1/media/Videos/" + url.PathEscape(id) + "/" + url.PathEscape(src.ID) + "/Subtitles/" + strconv.Itoa(x.Index) + "/0/Stream.vtt"
 			}

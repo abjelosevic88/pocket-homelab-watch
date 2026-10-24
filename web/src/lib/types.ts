@@ -52,7 +52,7 @@ export interface Upcoming {
   has_file: boolean; poster?: string; tmdb?: number; tvdb?: number; library_id?: string; mine: boolean
 }
 
-export interface StreamInfo { index: number; label: string; lang: string; codec: string; channels?: number; default?: boolean; forced?: boolean; external?: boolean; text: boolean; url?: string }
+export interface StreamInfo { index: number; label: string; lang: string; codec: string; channels?: number; default?: boolean; forced?: boolean; external?: boolean; text: boolean; url?: string; offset_ms?: number; file?: boolean }
 export interface PlayInfo {
   session: string; media_source: string; method: 'DirectPlay' | 'Transcode'; url: string; hls: boolean; start: number; runtime: number; title: Title
   audio: StreamInfo[]; audio_index: number; subtitles: StreamInfo[]; subtitle_index: number; burned: boolean
@@ -75,4 +75,5 @@ export interface Settings {
   ai_provider: 'auto' | 'pocket' | 'openai'; ai_pocket_model: string; openai_api_key: string; openai_model: string; openai_base_url: string
   setup_complete: boolean; base_url: string; jellyfin_url: boolean; jellyfin_public_url: string; requests: boolean; upcoming: boolean; seerr_link: string
   seerr_url?: string; seerr_public_url?: string; seerr_key?: string; sonarr_url?: string; sonarr_key?: string; radarr_url?: string; radarr_key?: string; maintainerr_url?: string; subtitles_url?: string
+  subtitles_mode?: '' | 'core' | 'direct' | 'off'; subtitles_api_url?: string; subtitles_token?: string; subtitles_mode_effective?: string
 }

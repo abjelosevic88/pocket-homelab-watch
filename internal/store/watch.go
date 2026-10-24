@@ -399,3 +399,33 @@ func (s *Store) PrevPosition(ctx context.Context, uid int64, itemID, day string)
 	_ = s.DB.QueryRowContext(ctx, `SELECT MAX(position) FROM watches WHERE user_id = ? AND item_id = ? AND day < ? AND completed = 0`, uid, itemID, day).Scan(&p)
 	return int(p.Int64)
 }
+
+// ---- subtitle offsets ----
+
+// SubtitleOffsets returns a person's offsets for a title's subtitle tracks (stream index → ms).
+func (s *Store) SubtitleOffsets(ctx context.Context, uid int64, itemID string) map[int]int {
+	out := map[int]int{}
+	rows, err := s.DB.QueryContext(ctx, `SELECT stream, ms FROM subtitle_offsets WHERE user_id = ? AND item_id = ?`, uid, itemID)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var st, ms int
+		if rows.Scan(&st, &ms) == nil {
+			out[st] = ms
+		}
+	}
+	return out
+}
+
+// SetSubtitleOffset stores (or with 0 forgets) a person's offset for one track.
+func (s *Store) SetSubtitleOffset(ctx context.Context, uid int64, itemID string, stream, ms int) error {
+	if ms == 0 {
+		_, err := s.DB.ExecContext(ctx, `DELETE FROM subtitle_offsets WHERE user_id = ? AND item_id = ? AND stream = ?`, uid, itemID, stream)
+		return err
+	}
+	_, err := s.DB.ExecContext(ctx, `INSERT INTO subtitle_offsets (user_id, item_id, stream, ms, updated_at) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(user_id, item_id, stream) DO UPDATE SET ms = excluded.ms, updated_at = excluded.updated_at`, uid, itemID, stream, ms, Now())
+	return err
+}

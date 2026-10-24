@@ -52,6 +52,16 @@ session of its own) the resume point and watched mark are written explicitly.
 Media segments (Jellyfin 10.10+, e.g. from the Intro Skipper plugin) drive "Skip intro" and "Skip recap"; the
 credits, or the last 25 seconds, bring up the next episode with a ten-second countdown.
 
+## Subtitle timing
+
+Subtitles running early or late are fixed in the player: `−1 s / −0.1 / +0.1 / +1 s` (or `g` and `h`) move the track
+for you at once — the cues are shifted in the browser, so it works for subtitles inside the video file too — and the
+offset is remembered per person, title and track. When the track is an .srt next to the video and Pocket Subtitles
+is connected, **Save for everyone** sends that offset to Pocket Subtitles: it shifts every line of the file, keeps a
+backup (undo), pins the file so its nightly sync doesn't redo the timing, and tells Jellyfin; your own offset goes
+back to zero and the track reloads. Watch reaches Pocket Subtitles as the person through a Pocket Core link
+(`subtitles:sync`), or with a token an admin set for the box.
+
 ## History
 
 One row per title per day: what it is (copied, so it survives the file leaving), how far it got, how many seconds

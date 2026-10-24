@@ -85,6 +85,10 @@ func (s *Server) Router() http.Handler {
 
 				r.Post("/play/{id}", s.handlePlay)
 				r.Post("/play/{id}/report", s.handleReport)
+				r.Get("/play/{id}/subtitles/{index}", s.handleSubtitleTiming)
+				r.Put("/play/{id}/subtitles/{index}/offset", s.handleSubtitleOffset)
+				r.Post("/play/{id}/subtitles/{index}/save", s.handleSubtitleSave)
+				r.Post("/play/{id}/subtitles/{index}/undo", s.handleSubtitleSave)
 
 				r.Get("/history", s.handleHistory)
 				r.Delete("/history/{id}", s.handleDeleteWatch)

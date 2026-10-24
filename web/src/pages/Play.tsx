@@ -30,8 +30,13 @@ export default function Play() {
   const [volume, setVolume] = useState(() => Number(localStorage.getItem('pwt-volume') ?? '1'))
   const [muted, setMuted] = useState(false)
   const [ui, setUi] = useState(true)
-  const [menu, setMenu] = useState<'' | 'tracks' | 'quality' | 'chapters'>('')
+  const [menu, setMenu] = useState<'' | 'tracks' | 'quality' | 'chapters' | 'timing'>('')
   const [sub, setSub] = useState(-1)
+  // subtitle timing: the person's offset per track (ms, + = later), applied to the cues here
+  const [offsets, setOffsets] = useState<Record<number, number>>({})
+  const [subsVersion, setSubsVersion] = useState(0)
+  const [osd, setOsd] = useState('')
+  const shifted = useRef(new WeakMap<TextTrack, number>())
   const [quality, setQuality] = useState<string>(() => localStorage.getItem('pwt-quality') || '')
   const [hover, setHover] = useState<{ x: number; t: number } | null>(null)
   const [fs, setFs] = useState(false)
@@ -60,6 +65,7 @@ export default function Play() {
       started.current = false
       setInfo(p)
       setSub(p.burned ? -1 : p.subtitle_index)
+      setOffsets(Object.fromEntries(p.subtitles.filter(x => x.offset_ms).map(x => [x.index, x.offset_ms as number])))
       attach(p, opts.start >= 0 ? opts.start : p.start)
     } catch (e) { setErr(errMsg(e)); setWaiting(false) }
   }, [id, quality]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -154,6 +160,44 @@ export default function Play() {
     return () => { clearTimeout(t); v.textTracks.removeEventListener?.('addtrack', apply) }
   }, [sub, info])
 
+  // move the showing track's cues by the person's offset (once per loaded track)
+  const applyOffset = useCallback(() => {
+    const v = video.current
+    if (!v) return
+    for (const tr of Array.from(v.textTracks)) {
+      if (tr.id !== `s${sub}` || !tr.cues || tr.cues.length === 0) continue
+      const want = offsets[sub] || 0
+      const done = shifted.current.get(tr) || 0
+      if (want === done) continue
+      const d = (want - done) / 1000
+      for (const c of Array.from(tr.cues)) { c.startTime += d; c.endTime += d }
+      shifted.current.set(tr, want)
+    }
+  }, [sub, offsets])
+  useEffect(() => {
+    const v = video.current
+    if (!v) return
+    applyOffset()
+    const timers = [200, 800, 2000, 5000].map(ms => window.setTimeout(applyOffset, ms))
+    const els = Array.from(v.querySelectorAll('track'))
+    els.forEach(t => t.addEventListener('load', applyOffset))
+    const cue = () => applyOffset()
+    Array.from(v.textTracks).forEach(t => t.addEventListener('cuechange', cue))
+    return () => { timers.forEach(clearTimeout); els.forEach(t => t.removeEventListener('load', applyOffset)); Array.from(v.textTracks).forEach(t => t.removeEventListener('cuechange', cue)) }
+  }, [applyOffset, info, subsVersion])
+  const saveOffset = useRef<number>(0)
+  const nudge = (ms: number, absolute = false) => {
+    if (sub < 0 || !info) return
+    const cur = offsets[sub] || 0
+    const next = Math.max(-600000, Math.min(600000, absolute ? ms : Math.round((cur + ms) / 50) * 50))
+    setOffsets(o => ({ ...o, [sub]: next }))
+    setOsd(next === 0 ? 'Subtitles: original timing' : `Subtitles ${fmtOffset(next)}`)
+    window.clearTimeout(saveOffset.current)
+    const idx = sub
+    saveOffset.current = window.setTimeout(() => { api.put(`${V1}/play/${id}/subtitles/${idx}/offset`, { ms: next }).catch(() => {}) }, 500)
+  }
+  useEffect(() => { if (!osd) return; const t = window.setTimeout(() => setOsd(''), 1400); return () => clearTimeout(t) }, [osd])
+
   // ---- the controls hide while watching ----
   const idle = useRef<number>(0)
   const poke = useCallback(() => {
@@ -215,6 +259,8 @@ export default function Play() {
         case 'ArrowDown': e.preventDefault(); v.volume = Math.max(0, v.volume - 0.1); poke(); break
         case 'm': v.muted = !v.muted; break
         case 'f': fullscreen(); break
+        case 'g': e.preventDefault(); nudge(-100); break
+        case 'h': e.preventDefault(); nudge(100); break
         case 'c': if (info) { const first = info.subtitles.find(s => s.text); setSub(sub >= 0 ? -1 : (info.subtitle_index >= 0 ? info.subtitle_index : first?.index ?? -1)) } break
         case 'N': goNext(); break
         case 's': if (seg) seek(seg.end); break
@@ -259,7 +305,7 @@ export default function Play() {
     <div ref={box} className={`player ${ui ? 'show-ui' : 'hide-ui'} ${sizeCls}`} onPointerMove={poke} onPointerDown={poke}>
       <video ref={video} className="player-video" playsInline crossOrigin="use-credentials" onClick={() => { if (menu) setMenu(''); else toggle() }} onDoubleClick={fullscreen}
         poster={t?.backdrop ? img(t.backdrop, 1600) : undefined}>
-        {info && !info.burned && info.subtitles.filter(s => s.text && s.url).map(s => <track key={s.index} id={`s${s.index}`} kind="subtitles" src={s.url} srcLang={s.lang || 'und'} label={s.label} />)}
+        {info && !info.burned && info.subtitles.filter(s => s.text && s.url).map(s => <track key={`${s.index}-${subsVersion}`} id={`s${s.index}`} kind="subtitles" src={subsVersion ? `${s.url}${s.url!.includes('?') ? '&' : '?'}v=${subsVersion}` : s.url} srcLang={s.lang || 'und'} label={s.label} />)}
       </video>
       {(waiting || !info) && !err && <div className="player-spin"><Spinner size={44} /></div>}
       {err && (
@@ -275,9 +321,10 @@ export default function Play() {
           <b className="ellipsis">{head}</b>
           {t?.type === 'episode' && <span className="ellipsis">{epCode(t.season, t.episode)} · {t.name}</span>}
         </div>
-        {info?.subtitles_tool && <a className="pbtn text" href={info.subtitles_tool} target="_blank" rel="noreferrer" title="Subtitles out of sync? Nudge them in Pocket Subtitles"><Icon name="cc" size={18} /><span className="hide-mobile">Out of sync?</span></a>}
+        {sub >= 0 && !info?.burned && <button type="button" className="pbtn text" onClick={() => setMenu(menu === 'timing' ? '' : 'timing')} title="Subtitles out of sync? Move them earlier or later (g / h)"><Icon name="clock" size={17} /><span className="hide-mobile">{offsets[sub] ? `Subtitles ${fmtOffset(offsets[sub])}` : 'Out of sync?'}</span></button>}
       </div>
 
+      {osd && <div className="player-osd" role="status">{osd}</div>}
       {seg && skipMode !== 'off' && <button type="button" className="skip-btn" onClick={() => seek(seg.end)}>{seg.type === 'recap' ? 'Skip recap' : seg.type === 'preview' ? 'Skip preview' : 'Skip intro'}<Icon name="skip-intro" size={16} /></button>}
       {nearEnd && info?.next && (
         <div className="next-card">
@@ -324,11 +371,14 @@ export default function Play() {
           <span className="ptime">{clock(time)} <span className="muted">/ {clock(rt)}</span></span>
           <span className="spacer" />
           {info && info.chapters.length > 1 && <button type="button" className={`pbtn ${menu === 'chapters' ? 'on' : ''}`} onClick={() => setMenu(menu === 'chapters' ? '' : 'chapters')} aria-label="Chapters"><Icon name="list" size={19} /></button>}
+          {sub >= 0 && !info?.burned && <button type="button" className={`pbtn ${menu === 'timing' ? 'on' : ''} ${offsets[sub] ? 'lit' : ''}`} onClick={() => setMenu(menu === 'timing' ? '' : 'timing')} aria-label="Subtitle timing" title="Subtitle timing (g earlier, h later)"><Icon name="clock" size={19} /></button>}
           <button type="button" className={`pbtn ${menu === 'tracks' ? 'on' : ''} ${sub >= 0 || info?.burned ? 'lit' : ''}`} onClick={() => setMenu(menu === 'tracks' ? '' : 'tracks')} aria-label="Audio and subtitles"><Icon name="cc" size={20} /></button>
           <button type="button" className={`pbtn ${menu === 'quality' ? 'on' : ''}`} onClick={() => setMenu(menu === 'quality' ? '' : 'quality')} aria-label="Quality"><Icon name="sliders" size={19} /></button>
           {'pictureInPictureEnabled' in document && <button type="button" className="pbtn hide-mobile" onClick={() => { const v = video.current; if (!v) return; if (document.pictureInPictureElement) document.exitPictureInPicture(); else v.requestPictureInPicture().catch(() => {}) }} aria-label="Picture in picture"><Icon name="pip" size={19} /></button>}
           <button type="button" className="pbtn" onClick={fullscreen} aria-label="Full screen"><Icon name={fs ? 'fullscreen-exit' : 'fullscreen'} size={19} /></button>
         </div>
+        {menu === 'timing' && info && sub >= 0 && <TimingPanel id={id} track={info.subtitles.find(x => x.index === sub)} offset={offsets[sub] || 0} onNudge={nudge}
+          onSaved={() => { setOffsets(o => ({ ...o, [sub]: 0 })); shifted.current = new WeakMap(); setSubsVersion(n => n + 1); setOsd('Saved for everyone') }} onUndone={() => { shifted.current = new WeakMap(); setSubsVersion(n => n + 1); setOsd('Back to the previous timing') }} />}
         {menu === 'tracks' && info && (
           <div className="pmenu tracks">
             <div>
@@ -355,6 +405,64 @@ export default function Play() {
             {info.chapters.map((c, i) => <button key={i} type="button" className="pitem" onClick={() => { seek(c.start); setMenu('') }}><span className="grow">{c.name || `Chapter ${i + 1}`}</span><span className="muted">{clock(c.start)}</span></button>)}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+/** +0.3 s / −1.2 s */
+function fmtOffset(ms: number): string {
+  const v = Math.abs(ms) / 1000
+  return `${ms > 0 ? '+' : ms < 0 ? '−' : ''}${v.toFixed(v >= 10 ? 0 : Math.abs(ms) % 100 === 0 ? 1 : 2)} s`
+}
+
+interface Timing { offset_ms: number; file: boolean; why?: string; via?: string; file_name?: string; file_ms?: number; pinned?: boolean; can_undo?: boolean; open_url?: string; connected?: boolean }
+
+/** Subtitle timing: move them earlier or later for you, then save it into the file for everyone (Pocket Subtitles). */
+function TimingPanel({ id, track, offset, onNudge, onSaved, onUndone }: { id: string; track?: StreamInfo; offset: number; onNudge: (ms: number, absolute?: boolean) => void; onSaved: () => void; onUndone: () => void }) {
+  const [t, setT] = useState<Timing | null>(null)
+  const [busy, setBusy] = useState('')
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    if (!track) return
+    let live = true
+    setT(null); setErr('')
+    api.get<Timing>(`${V1}/play/${id}/subtitles/${track.index}`).then(x => { if (live) setT(x) }).catch(e => { if (live) setErr(errMsg(e)) })
+    return () => { live = false }
+  }, [id, track?.index]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!track) return null
+  const act = async (what: 'save' | 'undo') => {
+    setBusy(what); setErr('')
+    try {
+      const x = await api.post<Timing>(`${V1}/play/${id}/subtitles/${track.index}/${what}`, what === 'save' ? { ms: offset } : {})
+      setT(x)
+      if (what === 'save') onSaved(); else onUndone()
+    } catch (e) { setErr(errMsg(e)) } finally { setBusy('') }
+  }
+  return (
+    <div className="pmenu timing" onClick={e => e.stopPropagation()}>
+      <h4>Subtitle timing · {track.label}</h4>
+      <div className="tm-row">
+        <button type="button" className="tm-btn" onClick={() => onNudge(-1000)}>−1 s</button>
+        <button type="button" className="tm-btn" onClick={() => onNudge(-100)}>−0.1</button>
+        <span className={`tm-value ${offset ? 'on' : ''}`}>{offset ? fmtOffset(offset) : 'In sync'}</span>
+        <button type="button" className="tm-btn" onClick={() => onNudge(100)}>+0.1</button>
+        <button type="button" className="tm-btn" onClick={() => onNudge(1000)}>+1 s</button>
+      </div>
+      <p className="tm-hint muted xsmall">Subtitles too early? Press <b>+</b> (or <kbd>h</kbd>). Too late? Press <b>−</b> (or <kbd>g</kbd>). This timing is yours and remembered for this title.{offset ? <> <button type="button" className="tm-link" onClick={() => onNudge(0, true)}>Reset</button></> : null}</p>
+      <div className="tm-everyone">
+        {!t && !err && <span className="muted xsmall"><Spinner size={11} /> Asking Pocket Subtitles…</span>}
+        {t && t.file && <>
+          <p className="xsmall muted" style={{ margin: 0 }}>{t.file_name}{t.file_ms ? ` · moved ${fmtOffset(t.file_ms)} so far` : ''}{t.pinned ? ' · pinned' : ''}</p>
+          <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="btn primary sm" disabled={!offset || !!busy} onClick={() => act('save')}>{busy === 'save' ? <Spinner size={12} /> : <Icon name="check" size={13} />}Save {offset ? fmtOffset(offset) : ''} for everyone</button>
+            {t.can_undo && <button type="button" className="btn glass sm" disabled={!!busy} onClick={() => act('undo')}>{busy === 'undo' ? <Spinner size={12} /> : <Icon name="undo" size={13} />}Undo last save</button>}
+            {t.open_url && <a className="btn glass sm" href={t.open_url} target="_blank" rel="noreferrer"><Icon name="external" size={13} />Pocket Subtitles</a>}
+          </div>
+          <p className="xsmall muted" style={{ margin: '8px 0 0' }}>Saving rewrites the subtitle file through Pocket Subtitles{t.via === 'core' ? ' as you' : ''} — every Jellyfin app gets the new timing, and the nightly sync keeps it.</p>
+        </>}
+        {t && !t.file && t.why && <p className="xsmall muted" style={{ margin: 0 }}>{t.why}</p>}
+        {err && <p className="xsmall" style={{ margin: '6px 0 0', color: '#fca5a5' }}>{err}</p>}
       </div>
     </div>
   )

@@ -34,6 +34,9 @@ Films, shows, seasons, episodes and people are **titles**: Jellyfin's item, trim
 |---|---|
 | `POST /play/{id}` | `{"start": -1, "caps": {…}, "audio": n, "subtitle": n, "quality": "auto\|20\|8\|…", "transcode": false, "replace": "<session>"}` → how to play it: `url` (under `/api/v1/media/`), `hls`, `method` (`DirectPlay` / `Transcode`), `start`, `runtime`, `audio` and `subtitles` (text ones with a WebVTT `url`), `chapters`, `segments` (intro, outro, recap…), `trickplay`, `next` / `prev` episode. `start` -1 resumes; `caps` says what the browser decodes; `replace` hands an old session over (switching tracks) |
 | `POST /play/{id}/report` | `{"session","event":"start\|progress\|pause\|unpause\|stop","position":seconds}` — passed on to Jellyfin as the person and written into history |
+| `GET /play/{id}/subtitles/{index}` | A subtitle track's timing: your `offset_ms`, and for an .srt Pocket Subtitles looks after `file`, `file_ms` (moved so far), `pinned`, `can_undo`, or `why` not |
+| `PUT /play/{id}/subtitles/{index}/offset {"ms":300}` | Your own timing for the track (positive = later); the player applies it |
+| `POST /play/{id}/subtitles/{index}/save {"ms":300}` · `POST …/undo` | Shift the .srt by that much for everyone through Pocket Subtitles (pinned, backed up), then forget your offset; or undo the last shift |
 | `GET /media/Videos/{id}/…` | The stream, HLS playlists and segments, subtitles and trickplay tiles, passed to Jellyfin with the person's own token (byte ranges included). Only `Videos/<id>/…` paths. |
 
 ## History and stats
@@ -84,7 +87,7 @@ watched and favourite marks, and the library scan; anything that changes users, 
 
 ## Pocket Core app links
 
-Watch offers two scopes to other Pocket apps (switched on per person in Pocket Core):
+Watch uses `subtitles:sync` in Pocket Subtitles (saving subtitle timing as the person) and offers two scopes to other Pocket apps (switched on per person in Pocket Core):
 
 | Scope | Routes |
 |---|---|

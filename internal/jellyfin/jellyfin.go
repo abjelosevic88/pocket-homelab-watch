@@ -279,6 +279,7 @@ type MediaStream struct {
 	RealFrameRate        float64 `json:"RealFrameRate"`
 	DeliveryMethod       string  `json:"DeliveryMethod"`
 	DeliveryURL          string  `json:"DeliveryUrl"`
+	Path                 string  `json:"Path"` // external subtitle files
 }
 
 // MediaSource is one playable version of an item.

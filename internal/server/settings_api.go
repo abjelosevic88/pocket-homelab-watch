@@ -49,6 +49,8 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		out["sonarr_url"], out["sonarr_key"] = st.SonarrURL, mask(st.SonarrKey)
 		out["radarr_url"], out["radarr_key"] = st.RadarrURL, mask(st.RadarrKey)
 		out["maintainerr_url"], out["subtitles_url"] = st.MaintainerrURL, st.SubtitlesURL
+		out["subtitles_mode"], out["subtitles_api_url"], out["subtitles_token"] = st.SubtitlesMode, st.SubtitlesAPIURL, mask(st.SubtitlesToken)
+		out["subtitles_mode_effective"] = s.subsMode(st)
 	}
 	return out
 }
@@ -151,6 +153,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		secret("radarr_key", &cur.RadarrKey, in.RadarrKey)
 		url("maintainerr_url", &cur.MaintainerrURL, in.MaintainerrURL)
 		url("subtitles_url", &cur.SubtitlesURL, in.SubtitlesURL)
+		oneOf("subtitles_mode", &cur.SubtitlesMode, in.SubtitlesMode, "", "core", "direct", "off")
+		url("subtitles_api_url", &cur.SubtitlesAPIURL, in.SubtitlesAPIURL)
+		secret("subtitles_token", &cur.SubtitlesToken, in.SubtitlesToken)
 		boxChanged = before != cur
 		if before.MaintainerrURL != cur.MaintainerrURL {
 			_ = s.store.CacheDelete(r.Context(), "maintainerr:")
@@ -218,6 +223,30 @@ func (s *Server) handleIntegrationTest(w http.ResponseWriter, r *http.Request) {
 	var msg string
 	var err error
 	switch in.Which {
+	case "subtitles":
+		if u.Role != "admin" {
+			writeErr(w, http.StatusForbidden, "only an admin can do that")
+			return
+		}
+		var sc *subsClient
+		if in.URL != "" || (in.Key != "" && !strings.Contains(in.Key, "••")) {
+			box, _ := s.store.GetSettings(ctx, 0)
+			sc = &subsClient{base: urlOr(box.SubtitlesAPIURL), token: keyOr(box.SubtitlesToken), via: "direct", http: s.http}
+		} else {
+			sc, err = s.subsFor(ctx, u)
+		}
+		if err == nil {
+			var me struct {
+				Email string `json:"email"`
+			}
+			if err = sc.do(ctx, http.MethodGet, "/auth/me", nil, &me); err == nil {
+				how := "with this box's token"
+				if sc.via == "core" {
+					how = "as you, through Pocket Core"
+				}
+				msg = "Pocket Subtitles answers " + how + " (" + me.Email + ")"
+			}
+		}
 	case "seerr", "sonarr", "radarr", "maintainerr":
 		if u.Role != "admin" {
 			writeErr(w, http.StatusForbidden, "only an admin can do that")

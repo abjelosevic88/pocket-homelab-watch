@@ -65,7 +65,11 @@ type Config struct {
 	RadarrURL           string
 	RadarrKey           string
 	MaintainerrURL      string
-	// Pocket Subtitles (admins): "subtitles out of sync?" in the player opens its nudge page.
+	// Pocket Subtitles: the player saves a subtitle's timing into the file through it
+	// (as the person via a Pocket Core link, or with this box's token), and admins get
+	// a link to its nudge page.
+	SubtitlesURL       string // its API as this app reaches it
+	SubtitlesToken     string
 	SubtitlesPublicURL string
 
 	// The owner's other integrations, copied once into the owner's own
@@ -180,6 +184,8 @@ func Load() (*Config, error) {
 		RadarrURL:           strings.TrimRight(env("RADARR_URL", ""), "/"),
 		RadarrKey:           env("RADARR_API_KEY", ""),
 		MaintainerrURL:      strings.TrimRight(env("MAINTAINERR_URL", ""), "/"),
+		SubtitlesURL:        strings.TrimRight(env("SUBTITLES_URL", ""), "/"),
+		SubtitlesToken:      env("SUBTITLES_API_TOKEN", ""),
 		SubtitlesPublicURL:  strings.TrimRight(env("SUBTITLES_PUBLIC_URL", ""), "/"),
 
 		NotifyURL:     env("NOTIFY_URL", ""),

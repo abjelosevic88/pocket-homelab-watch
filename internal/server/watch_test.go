@@ -33,7 +33,7 @@ func fakeJellyfin(t *testing.T) (*httptest.Server, *[]string) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"Id": movieID, "Name": "Sintel", "Type": "Movie", "ProductionYear": 2010, "RunTimeTicks": 900 * 10_000_000,
 			"MediaSources": []map[string]any{{"Id": "ms1", "Container": "mp4", "RunTimeTicks": 900 * 10_000_000, "DefaultAudioStreamIndex": 1,
 				"MediaStreams": []map[string]any{{"Index": 0, "Type": "Video", "Codec": "h264"}, {"Index": 1, "Type": "Audio", "Codec": "aac", "Language": "eng"},
-					{"Index": 2, "Type": "Subtitle", "Codec": "subrip", "Language": "eng", "IsTextSubtitleStream": true, "IsExternal": true}}}}})
+					{"Index": 2, "Type": "Subtitle", "Codec": "subrip", "Language": "eng", "IsTextSubtitleStream": true, "IsExternal": true, "Path": "/media/movies/Sintel (2010)/Sintel (2010).en.srt"}}}}})
 	})
 	mux.HandleFunc("/Items/"+movieID+"/PlaybackInfo", func(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"PlaySessionId": "ps-" + r.URL.Query().Get("userId"), "MediaSources": []map[string]any{{"Id": "ms1", "Container": "mp4", "SupportsDirectPlay": true}}})
@@ -216,5 +216,63 @@ func TestDaySummary(t *testing.T) {
 	ws := []store.Watch{{Kind: "movie", Title: "Sintel"}, {Kind: "episode", Series: "Bonanza"}, {Kind: "episode", Series: "Bonanza"}, {Kind: "episode", Series: "Pioneer One"}}
 	if got := daySummary(ws); got != "Sintel, 2 episodes of Bonanza and an episode of Pioneer One" {
 		t.Fatalf("daySummary = %q", got)
+	}
+}
+
+// Fixing subtitle timing: the offset is per person; saving sends it to Pocket
+// Subtitles as a nudge of that file and forgets the personal offset.
+func TestSubtitleTiming(t *testing.T) {
+	s, h, _, _ := testServer(t)
+	ctx := context.Background()
+	var nudged []string
+	ps := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer subs-token" {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		switch {
+		case r.URL.Path == "/api/v1/files/by-path" && strings.HasSuffix(r.URL.Query().Get("path"), "Sintel (2010).en.srt"):
+			_, _ = io.WriteString(w, `{"id":7,"rel":"movies/Sintel (2010)/Sintel (2010).en.srt","pinned":false,"nudge_ms":0,"can_undo":false,"exists":true,"runs":[],"events":[]}`)
+		case r.URL.Path == "/api/v1/files/7/nudge":
+			b, _ := io.ReadAll(r.Body)
+			nudged = append(nudged, string(b))
+			_, _ = io.WriteString(w, `{"cues":3}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ps.Close()
+	box, _ := s.store.GetSettings(ctx, 0)
+	box.SubtitlesAPIURL, box.SubtitlesToken = ps.URL, "subs-token"
+	if err := s.store.SaveBoxSettings(ctx, box); err != nil {
+		t.Fatal(err)
+	}
+	ana, ben := addPerson(t, s, "ana@example.com", "tokA"), addPerson(t, s, "ben@example.com", "tokB")
+	base := "/api/v1/play/" + movieID + "/subtitles/2"
+
+	if r := call(t, h, ana, "GET", base, ""); r.Code != 200 || !strings.Contains(r.Body.String(), `"file":true`) || !strings.Contains(r.Body.String(), `"file_id":7`) {
+		t.Fatalf("timing: %d %s", r.Code, r.Body)
+	}
+	if r := call(t, h, ana, "PUT", base+"/offset", `{"ms":350}`); r.Code != 200 {
+		t.Fatalf("offset: %d %s", r.Code, r.Body)
+	}
+	if got := s.store.SubtitleOffsets(ctx, ben.u.ID, movieID)[2]; got != 0 {
+		t.Fatalf("Ben sees Ana's offset: %d", got)
+	}
+	r := call(t, h, ana, "POST", "/api/v1/play/"+movieID, `{"start":-1,"caps":{"mse":true}}`)
+	if !strings.Contains(r.Body.String(), `"offset_ms":350`) || !strings.Contains(r.Body.String(), `"file":true`) {
+		t.Fatalf("play answer lacks the offset: %s", r.Body)
+	}
+	if r := call(t, h, ana, "POST", base+"/save", `{"ms":350}`); r.Code != 200 {
+		t.Fatalf("save: %d %s", r.Code, r.Body)
+	}
+	if len(nudged) != 1 || !strings.Contains(nudged[0], `"ms":350`) {
+		t.Fatalf("Pocket Subtitles got %v", nudged)
+	}
+	if got := s.store.SubtitleOffsets(ctx, ana.u.ID, movieID)[2]; got != 0 {
+		t.Fatalf("offset kept after saving: %d", got)
+	}
+	if r := call(t, h, ana, "GET", "/api/v1/play/"+movieID+"/subtitles/9", ""); r.Code != http.StatusNotFound {
+		t.Fatalf("unknown track: %d", r.Code)
 	}
 }

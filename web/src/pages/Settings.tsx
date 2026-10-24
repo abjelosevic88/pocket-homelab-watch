@@ -357,9 +357,36 @@ function Services() {
       {svc('sonarr', 'Sonarr', 'tv', 'Upcoming episodes (the calendar only).', 'sonarr_url', 'sonarr_key', 'http://sonarr:8989')}
       {svc('radarr', 'Radarr', 'film', 'Upcoming films: cinema, digital and disc releases.', 'radarr_url', 'radarr_key', 'http://radarr:7878')}
       {svc('maintainerr', 'Maintainerr', 'hourglass', '“Leaving soon”: titles a cleanup rule will remove, with the day.', 'maintainerr_url', null, 'http://maintainerr:6246')}
-      {svc('', 'Pocket Subtitles', 'cc', 'Admins get “Out of sync?” in the player, which opens the nudge page for that episode.', 'subtitles_url', null, 'https://subtitles.example.com')}
+      <SubtitlesService f={f} setF={setF} run={run} status={status} />
       <div className="row"><button type="button" className="btn primary" onClick={() => save()} disabled={busy}>Save changes</button></div>
     </div>
+  )
+}
+
+function SubtitlesService({ f, setF, run, status }: { f: SettingsT; setF: (s: SettingsT) => void; run: (which: string, url: string, key: string) => void; status: (which: string) => React.ReactNode }) {
+  const coreOn = f.core_configured && f.core_registered !== false
+  const mode = f.subtitles_mode || ''
+  const eff = f.subtitles_mode_effective || 'off'
+  return (
+    <Section title="Pocket Subtitles" icon="cc" actions={<span className={`badge ${eff !== 'off' ? 'ok' : ''}`}>{eff === 'core' ? 'through Pocket Core' : eff === 'direct' ? 'with a token' : 'off'}</span>}
+      sub="While watching, anyone can move a subtitle track earlier or later for themselves. With Pocket Subtitles connected they can also save that timing into the .srt file for everyone: it shifts every line, pins the file so the nightly sync keeps it, and keeps a backup for undo.">
+      <div className="stack">
+        <Field group label="How Watch reaches it">
+          <Segmented size="sm" value={mode} onChange={v => setF({ ...f, subtitles_mode: v })} options={[
+            { value: '', label: 'Automatic' },
+            { value: 'core', label: 'Pocket Core', disabled: !coreOn, title: coreOn ? 'As each person, through the app link (switch it on in Pocket Core → Links)' : 'Needs Pocket Core' },
+            { value: 'direct', label: 'Token' }, { value: 'off', label: 'Off' }]} />
+        </Field>
+        {!coreOn && <CoreHint />}
+        <p className="muted small" style={{ margin: 0 }}>Automatic uses the token when one is set, else Pocket Core (each person acts as themselves; the link “Pocket Watch → Pocket Subtitles” has to be switched on in Pocket Core → Links).</p>
+        <div className="two-col">
+          <Field label="API address" help="As this server reaches it, e.g. http://pocket-subtitles:8080"><input value={f.subtitles_api_url || ''} onChange={e => setF({ ...f, subtitles_api_url: e.target.value })} placeholder="http://pocket-subtitles:8080" /></Field>
+          <Field label="API token" help="Pocket Subtitles → Settings → API tokens"><input value={f.subtitles_token || ''} onChange={e => setF({ ...f, subtitles_token: e.target.value })} autoComplete="off" /></Field>
+        </div>
+        <Field label="Address people open" help="Admins get a link to the file there from the player."><input value={f.subtitles_url || ''} onChange={e => setF({ ...f, subtitles_url: e.target.value })} placeholder="https://subtitles.example.com" /></Field>
+        <div className="row"><button type="button" className="btn sm" onClick={() => run('subtitles', mode === 'direct' ? f.subtitles_api_url || '' : '', mode === 'direct' ? f.subtitles_token || '' : '')}>Test</button>{status('subtitles')}</div>
+      </div>
+    </Section>
   )
 }
 

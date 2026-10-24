@@ -63,6 +63,8 @@ resume points and watched marks are shared. More in [docs/design.md](docs/design
   it can't; audio and subtitle tracks (text subtitles switch instantly, image ones are burned in), quality, chapters,
   seek previews (trickplay), skip intro and recap (media segments), the next episode with a countdown, picture in
   picture, the lock screen and keyboard shortcuts.
+- Subtitles out of sync? Move them earlier or later while you watch (for you, remembered per title), and save the
+  fix into the file for everyone through [Pocket Subtitles](https://github.com/abjelosevic88/pocket-homelab-subtitles).
 - Progress goes back to Jellyfin as you, every ten seconds — the TV picks up where the laptop stopped.
 - **Pocket Homelab** on the phone plays through Pocket Watch too: it answers the Jellyfin API at `/jellyfin` with your Pocket Watch (or Pocket Core) token, so the phone never holds your Jellyfin login.
 
@@ -86,7 +88,6 @@ resume points and watched marks are shared. More in [docs/design.md](docs/design
 - One sign-in; each person’s Jellyfin login can come from Core — nothing to paste.
 - Pocket Day can write “what you watched” into your journal (`watching:read`); other apps can put titles on your
   watchlist or request them (`requests:write`); events for finished titles, requests and arrivals.
-- Admins get “Out of sync?” in the player, straight to [Pocket Subtitles](https://github.com/abjelosevic88/pocket-homelab-subtitles)' nudge page.
 - Strictly per person: history, watchlist, requests and settings are yours; admins don’t see anyone else’s watching.
 
 ## Run it
