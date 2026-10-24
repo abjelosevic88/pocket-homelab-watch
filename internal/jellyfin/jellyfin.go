@@ -571,11 +571,16 @@ func (c *Client) Segments(ctx context.Context, id string) ([]Segment, error) {
 // Raw sends a request as the person and returns the answer unread (streams,
 // HLS playlists and segments, subtitles, images).
 func (c *Client) Raw(ctx context.Context, method, path, rawQuery string, hdr http.Header) (*http.Response, error) {
+	return c.RawBody(ctx, method, path, rawQuery, hdr, nil)
+}
+
+// RawBody is Raw with a request body (the /jellyfin gateway's POSTs).
+func (c *Client) RawBody(ctx context.Context, method, path, rawQuery string, hdr http.Header, body io.Reader) (*http.Response, error) {
 	u := c.Base + path
 	if rawQuery != "" {
 		u += "?" + rawQuery
 	}
-	r, err := http.NewRequestWithContext(ctx, method, u, nil)
+	r, err := http.NewRequestWithContext(ctx, method, u, body)
 	if err != nil {
 		return nil, err
 	}

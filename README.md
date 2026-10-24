@@ -64,6 +64,7 @@ resume points and watched marks are shared. More in [docs/design.md](docs/design
   seek previews (trickplay), skip intro and recap (media segments), the next episode with a countdown, picture in
   picture, the lock screen and keyboard shortcuts.
 - Progress goes back to Jellyfin as you, every ten seconds — the TV picks up where the laptop stopped.
+- **Pocket Homelab** on the phone plays through Pocket Watch too: it answers the Jellyfin API at `/jellyfin` with your Pocket Watch (or Pocket Core) token, so the phone never holds your Jellyfin login.
 
 **Yours**
 - A watch history Pocket Watch keeps: from its own player as you watch, and from every other Jellyfin app (read

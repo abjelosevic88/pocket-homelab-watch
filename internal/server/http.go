@@ -35,6 +35,9 @@ func (s *Server) Router() http.Handler {
 		r.Get("/metrics", s.handleMetrics)
 	}
 
+	// Jellyfin apps (Pocket Homelab) through Pocket Watch: no timeout or gzip, a film streams for hours.
+	r.HandleFunc("/jellyfin/*", s.handleGateway)
+
 	r.Route("/api/v1", func(r chi.Router) {
 		// long-lived: video, images and subtitles must not hit the request timeout or be gzipped
 		r.Group(func(r chi.Router) {

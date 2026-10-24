@@ -72,6 +72,16 @@ Films, shows, seasons, episodes and people are **titles**: Jellyfin's item, trim
 `{"intro","provider":"pocket|openai|","picks":[{"title":…,"why":"…"}]}`. The AI sees only unwatched titles' names,
 years, genres, lengths and ratings.
 
+## Jellyfin apps (`/jellyfin/*`)
+
+Pocket Watch answers the Jellyfin API under `/jellyfin` for the Pocket Homelab app: use `https://watch.example.com/jellyfin`
+as the Jellyfin address and sign in with a personal token (`pwt_…`, Settings → API & shortcuts) or the token Pocket Core
+gave a paired phone — in `Authorization: MediaBrowser Token="…"`, `X-Emby-Token` or `api_key`. Each call goes to Jellyfin
+with the person's own Jellyfin login (Settings → Jellyfin), which never leaves the box: where Jellyfin writes it into an
+answer (HLS playlists, transcoding URLs) it is replaced by the token the app sent. `GET /Users` and `/Users/Me` return only
+the person. Passed on: reading the library, images, streams and downloads, trickplay and media segments, playback reports,
+watched and favourite marks, and the library scan; anything that changes users, policies or the server is refused (403).
+
 ## Pocket Core app links
 
 Watch offers two scopes to other Pocket apps (switched on per person in Pocket Core):
