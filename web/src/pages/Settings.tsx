@@ -335,6 +335,18 @@ function Notifications() {
 
 type SvcStatus = { mode: string; via?: string; url?: string; error?: string }
 
+/** The address and key: shown for Direct; for Automatic only while Core isn't the way in (else folded behind a link). */
+function Fallback({ mode, st, children }: { mode: string; st?: SvcStatus; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  if (mode === 'core' || mode === 'off') return null
+  if (mode === 'direct') return <>{children}</>
+  if (st && st.via !== 'core' && !(st.error && mode === 'off')) return <>{children}</>
+  if (!st) return null
+  return open
+    ? <><p className="muted small" style={{ margin: 0 }}>Used only when Pocket Core can't answer. <button type="button" className="link-btn" onClick={() => setOpen(false)}>Hide</button></p>{children}</>
+    : <p className="muted small" style={{ margin: 0 }}><button type="button" className="link-btn" onClick={() => setOpen(true)}>Direct fallback…</button></p>
+}
+
 /** One line on how a service is reached right now: through Pocket Core, directly, or why not. */
 function SvcLine({ st }: { st?: SvcStatus }) {
   if (!st) return <p className="svc-line muted small"><span className="dot" />Checking…</p>
@@ -365,13 +377,12 @@ function Services() {
             { value: 'direct', label: 'Direct' }, { value: 'off', label: 'Off' }]} />
           {!coreOn && <CoreHint />}
           <SvcLine st={st} />
-          {mode !== 'core' && mode !== 'off' && <>
-            {mode === '' && coreOn && <p className="muted small" style={{ margin: 0 }}>Used when Pocket Core can't answer:</p>}
+          <Fallback mode={mode} st={st}>
             <div className={keyKey ? 'two-col' : ''}>
               <Field label="Address"><input value={String(f[urlKey] || '')} onChange={e => setF({ ...f, [urlKey]: e.target.value })} placeholder={placeholder} /></Field>
               {keyKey && <Field label="API key"><input value={String(f[keyKey] || '')} onChange={e => setF({ ...f, [keyKey]: e.target.value })} autoComplete="off" /></Field>}
             </div>
-          </>}
+          </Fallback>
           {extra}
           <div className="row"><button type="button" className="btn sm" onClick={() => run(which, '', '')} disabled={mode === 'off'}>Test</button>{status(which)}</div>
         </div>
@@ -408,11 +419,12 @@ function SubtitlesService({ f, setF, run, status, live }: { f: SettingsT; setF: 
         </Field>
         {!coreOn && <CoreHint />}
         <SvcLine st={live} />
-        <p className="muted small" style={{ margin: 0 }}>Automatic goes through Pocket Core as each person (switch “Pocket Watch → Pocket Subtitles” on in Pocket Core → Links) and uses the token while Core can't.</p>
+        <Fallback mode={mode} st={live}>
         <div className="two-col">
           <Field label="API address" help="As this server reaches it, e.g. http://pocket-subtitles:8080"><input value={f.subtitles_api_url || ''} onChange={e => setF({ ...f, subtitles_api_url: e.target.value })} placeholder="http://pocket-subtitles:8080" /></Field>
           <Field label="API token" help="Pocket Subtitles → Settings → API tokens"><input value={f.subtitles_token || ''} onChange={e => setF({ ...f, subtitles_token: e.target.value })} autoComplete="off" /></Field>
         </div>
+        </Fallback>
         <Field label="Address people open" help="Admins get a link to the file there from the player."><input value={f.subtitles_url || ''} onChange={e => setF({ ...f, subtitles_url: e.target.value })} placeholder="https://subtitles.example.com" /></Field>
         <div className="row"><button type="button" className="btn sm" onClick={() => run('subtitles', mode === 'direct' ? f.subtitles_api_url || '' : '', mode === 'direct' ? f.subtitles_token || '' : '')}>Test</button>{status('subtitles')}</div>
       </div>
