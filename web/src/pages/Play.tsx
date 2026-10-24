@@ -37,6 +37,8 @@ export default function Play() {
   const [subsVersion, setSubsVersion] = useState(0)
   const [osd, setOsd] = useState('')
   const shifted = useRef(new WeakMap<TextTrack, number>())
+  // what Pocket Subtitles says about each track, fetched as soon as a track is chosen so the panel never waits
+  const [timings, setTimings] = useState<Record<number, Timing | 'error'>>({})
   const [quality, setQuality] = useState<string>(() => localStorage.getItem('pwt-quality') || '')
   const [hover, setHover] = useState<{ x: number; t: number } | null>(null)
   const [fs, setFs] = useState(false)
@@ -196,6 +198,12 @@ export default function Play() {
     const idx = sub
     saveOffset.current = window.setTimeout(() => { api.put(`${V1}/play/${id}/subtitles/${idx}/offset`, { ms: next }).catch(() => {}) }, 500)
   }
+  useEffect(() => {
+    if (!info || sub < 0 || timings[sub]) return
+    let live = true
+    api.get<Timing>(`${V1}/play/${id}/subtitles/${sub}`).then(t => { if (live) setTimings(m => ({ ...m, [sub]: t })) }).catch(() => { if (live) setTimings(m => ({ ...m, [sub]: 'error' })) })
+    return () => { live = false }
+  }, [id, info, sub]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (!osd) return; const t = window.setTimeout(() => setOsd(''), 1400); return () => clearTimeout(t) }, [osd])
 
   // ---- the controls hide while watching ----
@@ -371,14 +379,15 @@ export default function Play() {
           <span className="ptime">{clock(time)} <span className="muted">/ {clock(rt)}</span></span>
           <span className="spacer" />
           {info && info.chapters.length > 1 && <button type="button" className={`pbtn ${menu === 'chapters' ? 'on' : ''}`} onClick={() => setMenu(menu === 'chapters' ? '' : 'chapters')} aria-label="Chapters"><Icon name="list" size={19} /></button>}
-          {sub >= 0 && !info?.burned && <button type="button" className={`pbtn ${menu === 'timing' ? 'on' : ''} ${offsets[sub] ? 'lit' : ''}`} onClick={() => setMenu(menu === 'timing' ? '' : 'timing')} aria-label="Subtitle timing" title="Subtitle timing (g earlier, h later)"><Icon name="clock" size={19} /></button>}
+          {sub >= 0 && !info?.burned && <button type="button" className={`pbtn hide-mobile ${menu === 'timing' ? 'on' : ''} ${offsets[sub] ? 'lit' : ''}`} onClick={() => setMenu(menu === 'timing' ? '' : 'timing')} aria-label="Subtitle timing" title="Subtitle timing (g earlier, h later)"><Icon name="clock" size={19} /></button>}
           <button type="button" className={`pbtn ${menu === 'tracks' ? 'on' : ''} ${sub >= 0 || info?.burned ? 'lit' : ''}`} onClick={() => setMenu(menu === 'tracks' ? '' : 'tracks')} aria-label="Audio and subtitles"><Icon name="cc" size={20} /></button>
           <button type="button" className={`pbtn ${menu === 'quality' ? 'on' : ''}`} onClick={() => setMenu(menu === 'quality' ? '' : 'quality')} aria-label="Quality"><Icon name="sliders" size={19} /></button>
           {'pictureInPictureEnabled' in document && <button type="button" className="pbtn hide-mobile" onClick={() => { const v = video.current; if (!v) return; if (document.pictureInPictureElement) document.exitPictureInPicture(); else v.requestPictureInPicture().catch(() => {}) }} aria-label="Picture in picture"><Icon name="pip" size={19} /></button>}
           <button type="button" className="pbtn" onClick={fullscreen} aria-label="Full screen"><Icon name={fs ? 'fullscreen-exit' : 'fullscreen'} size={19} /></button>
         </div>
-        {menu === 'timing' && info && sub >= 0 && <TimingPanel id={id} track={info.subtitles.find(x => x.index === sub)} offset={offsets[sub] || 0} onNudge={nudge}
-          onSaved={() => { setOffsets(o => ({ ...o, [sub]: 0 })); shifted.current = new WeakMap(); setSubsVersion(n => n + 1); setOsd('Saved for everyone') }} onUndone={() => { shifted.current = new WeakMap(); setSubsVersion(n => n + 1); setOsd('Back to the previous timing') }} />}
+        {menu === 'timing' && info && sub >= 0 && <TimingPanel id={id} track={info.subtitles.find(x => x.index === sub)} offset={offsets[sub] || 0} timing={timings[sub]} onNudge={nudge} onClose={() => setMenu('')}
+          onSaved={t => { setTimings(m => ({ ...m, [sub]: t })); setOffsets(o => ({ ...o, [sub]: 0 })); shifted.current = new WeakMap(); setSubsVersion(n => n + 1); setOsd('Saved for everyone') }}
+          onUndone={t => { setTimings(m => ({ ...m, [sub]: t })); shifted.current = new WeakMap(); setSubsVersion(n => n + 1); setOsd('Back to the previous timing') }} />}
         {menu === 'tracks' && info && (
           <div className="pmenu tracks">
             <div>
@@ -418,52 +427,81 @@ function fmtOffset(ms: number): string {
 
 interface Timing { offset_ms: number; file: boolean; why?: string; via?: string; file_name?: string; file_ms?: number; pinned?: boolean; can_undo?: boolean; open_url?: string; connected?: boolean }
 
-/** Subtitle timing: move them earlier or later for you, then save it into the file for everyone (Pocket Subtitles). */
-function TimingPanel({ id, track, offset, onNudge, onSaved, onUndone }: { id: string; track?: StreamInfo; offset: number; onNudge: (ms: number, absolute?: boolean) => void; onSaved: () => void; onUndone: () => void }) {
-  const [t, setT] = useState<Timing | null>(null)
-  const [busy, setBusy] = useState('')
+/** "Serbian · SDH" out of Jellyfin's "Serbian - Hearing Impaired - SUBRIP - External". */
+function trackName(t: StreamInfo): string {
+  const parts = t.label.split(' - ').map(x => x.trim())
+  const tags = [/hearing impaired|sdh|\bcc\b/i.test(t.label) ? 'SDH' : '', t.forced || /forced/i.test(t.label) ? 'Forced' : ''].filter(Boolean)
+  return [parts[0] || t.lang || 'Subtitles', ...tags].join(' · ')
+}
+
+/** Subtitle timing: move them earlier or later for you, then save it into the file for everyone (Pocket Subtitles).
+ *  The layout is fixed from the first frame: what Pocket Subtitles knows was fetched before the panel opened, and
+ *  until it arrives only the status line waits (a placeholder bar), nothing moves. */
+function TimingPanel({ id, track, offset, timing, onNudge, onClose, onSaved, onUndone }: {
+  id: string; track?: StreamInfo; offset: number; timing?: Timing | 'error'; onNudge: (ms: number, absolute?: boolean) => void; onClose: () => void
+  onSaved: (t: Timing) => void; onUndone: (t: Timing) => void
+}) {
+  const [busy, setBusy] = useState<'' | 'save' | 'undo'>('')
   const [err, setErr] = useState('')
-  useEffect(() => {
-    if (!track) return
-    let live = true
-    setT(null); setErr('')
-    api.get<Timing>(`${V1}/play/${id}/subtitles/${track.index}`).then(x => { if (live) setT(x) }).catch(e => { if (live) setErr(errMsg(e)) })
-    return () => { live = false }
-  }, [id, track?.index]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!track) return null
+  const t = timing && timing !== 'error' ? timing : null
+  const loading = !timing
+  const fileTrack = !!track.file
+  const canSave = fileTrack && !!t?.file
   const act = async (what: 'save' | 'undo') => {
     setBusy(what); setErr('')
     try {
       const x = await api.post<Timing>(`${V1}/play/${id}/subtitles/${track.index}/${what}`, what === 'save' ? { ms: offset } : {})
-      setT(x)
-      if (what === 'save') onSaved(); else onUndone()
+      if (what === 'save') onSaved(x); else onUndone(x)
     } catch (e) { setErr(errMsg(e)) } finally { setBusy('') }
   }
+  const fileName = t?.file_name ? t.file_name.split('/').pop() : ''
+  let status: React.ReactNode
+  if (err) status = <span className="tm-err">{err}</span>
+  else if (!fileTrack) status = <span>{track.external ? 'Not an .srt — your timing stays yours.' : 'Inside the video — your timing stays yours.'}</span>
+  else if (loading) status = <span className="tm-skel" aria-label="Checking Pocket Subtitles" />
+  else if (timing === 'error' || !t?.file) status = <span title={t?.why}>{t?.why || 'Pocket Subtitles did not answer.'}</span>
+  else status = <span title={t.file_name}>{t.file_ms ? <>File moved <b>{fmtOffset(t.file_ms)}</b> so far{t.pinned ? ' · pinned' : ''}</> : <>File at its original timing</>}</span>
   return (
-    <div className="pmenu timing" onClick={e => e.stopPropagation()}>
-      <h4>Subtitle timing · {track.label}</h4>
-      <div className="tm-row">
-        <button type="button" className="tm-btn" onClick={() => onNudge(-1000)}>−1 s</button>
-        <button type="button" className="tm-btn" onClick={() => onNudge(-100)}>−0.1</button>
-        <span className={`tm-value ${offset ? 'on' : ''}`}>{offset ? fmtOffset(offset) : 'In sync'}</span>
-        <button type="button" className="tm-btn" onClick={() => onNudge(100)}>+0.1</button>
-        <button type="button" className="tm-btn" onClick={() => onNudge(1000)}>+1 s</button>
+    <div className="pmenu timing" role="dialog" aria-label="Subtitle timing" onClick={e => e.stopPropagation()}>
+      <div className="tm-head">
+        <b>Subtitle timing</b>
+        <span className="tm-chip" title={track.label}>{trackName(track)}</span>
+        <span className="spacer" />
+        <button type="button" className="tm-x" onClick={onClose} aria-label="Close"><Icon name="x" size={16} /></button>
       </div>
-      <p className="tm-hint muted xsmall">Subtitles too early? Press <b>+</b> (or <kbd>h</kbd>). Too late? Press <b>−</b> (or <kbd>g</kbd>). This timing is yours and remembered for this title.{offset ? <> <button type="button" className="tm-link" onClick={() => onNudge(0, true)}>Reset</button></> : null}</p>
-      <div className="tm-everyone">
-        {!t && !err && <span className="muted xsmall"><Spinner size={11} /> Asking Pocket Subtitles…</span>}
-        {t && t.file && <>
-          <p className="xsmall muted" style={{ margin: 0 }}>{t.file_name}{t.file_ms ? ` · moved ${fmtOffset(t.file_ms)} so far` : ''}{t.pinned ? ' · pinned' : ''}</p>
-          <div className="row" style={{ gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-            <button type="button" className="btn primary sm" disabled={!offset || !!busy} onClick={() => act('save')}>{busy === 'save' ? <Spinner size={12} /> : <Icon name="check" size={13} />}Save {offset ? fmtOffset(offset) : ''} for everyone</button>
-            {t.can_undo && <button type="button" className="btn glass sm" disabled={!!busy} onClick={() => act('undo')}>{busy === 'undo' ? <Spinner size={12} /> : <Icon name="undo" size={13} />}Undo last save</button>}
-            {t.open_url && <a className="btn glass sm" href={t.open_url} target="_blank" rel="noreferrer"><Icon name="external" size={13} />Pocket Subtitles</a>}
-          </div>
-          <p className="xsmall muted" style={{ margin: '8px 0 0' }}>Saving rewrites the subtitle file through Pocket Subtitles{t.via === 'core' ? ' as you' : ''} — every Jellyfin app gets the new timing, and the nightly sync keeps it.</p>
-        </>}
-        {t && !t.file && t.why && <p className="xsmall muted" style={{ margin: 0 }}>{t.why}</p>}
-        {err && <p className="xsmall" style={{ margin: '6px 0 0', color: '#fca5a5' }}>{err}</p>}
+      <div className="tm-stepper">
+        <button type="button" className="tm-btn" onClick={() => onNudge(-1000)} aria-label="One second earlier">−1s</button>
+        <button type="button" className="tm-btn" onClick={() => onNudge(-100)} aria-label="A tenth of a second earlier">−0.1</button>
+        <div className={`tm-value ${offset ? 'on' : ''}`}>
+          <b>{offset ? fmtOffset(offset) : '0.0 s'}</b>
+          <span>{offset > 0 ? 'later' : offset < 0 ? 'earlier' : 'original timing'}</span>
+        </div>
+        <button type="button" className="tm-btn" onClick={() => onNudge(100)} aria-label="A tenth of a second later">+0.1</button>
+        <button type="button" className="tm-btn" onClick={() => onNudge(1000)} aria-label="One second later">+1s</button>
       </div>
+      <div className="tm-hint">
+        <span>Too early → <b>+</b> <kbd>h</kbd> · too late → <b>−</b> <kbd>g</kbd></span>
+        <button type="button" className="tm-link" onClick={() => onNudge(0, true)} disabled={!offset}>Reset</button>
+      </div>
+      <div className={`tm-everyone ${fileTrack ? '' : 'muted-row'}`}>
+        <div className="tm-ev-text">
+          <span className="tm-ev-title" title="Saving rewrites the .srt through Pocket Subtitles: every Jellyfin app gets the new timing, the file is pinned so the nightly sync keeps it, and a backup is kept for undo.">For everyone{fileName ? <span className="tm-file"> · {fileName}</span> : null}</span>
+          <span className="tm-ev-status">{status}</span>
+        </div>
+        {fileTrack && (
+          <button type="button" className="btn primary sm tm-save" disabled={!canSave || !offset || !!busy} onClick={() => act('save')}
+            title={!offset ? 'Move the subtitles first' : `Shift the file ${fmtOffset(offset)} for everyone`}>
+            {busy === 'save' ? <Spinner size={12} /> : <Icon name="check" size={13} />}Save{offset ? ` ${fmtOffset(offset)}` : ''}
+          </button>
+        )}
+      </div>
+      {canSave && (t?.can_undo || t?.open_url) && (
+        <div className="tm-links">
+          {t?.can_undo && <button type="button" className="tm-link" disabled={!!busy} onClick={() => act('undo')}>{busy === 'undo' ? 'Undoing…' : 'Undo last save'}</button>}
+          {t?.open_url && <a className="tm-link" href={t.open_url} target="_blank" rel="noreferrer">Open in Pocket Subtitles ↗</a>}
+        </div>
+      )}
     </div>
   )
 }
