@@ -33,15 +33,17 @@ var (
 	// writes a player makes; nothing that changes users, policies or the server
 	gatewayWrite = regexp.MustCompile(`^/(UserItems/[^/]+/UserData|UserPlayedItems/[^/]+|UserFavoriteItems/[^/]+|Users/[^/]+/(PlayedItems|FavoriteItems|PlayingItems)/[^/]+(/[^/]+)?|Items/[^/]+/PlaybackInfo|Sessions/Playing(/Progress|/Stopped|/Ping)?|Videos/ActiveEncodings|Library/Refresh)$`)
 	// how Jellyfin clients pass a token in a header
-	mediaBrowserToken = regexp.MustCompile(`(?i)\btoken="([^"]*)"`)
+	mediaBrowserToken = regexp.MustCompile(`(?i)\btoken=(?:"([^"]*)"|([^,\s"]+))`)
 )
 
 // gatewayToken is the token a Jellyfin client sent, and whether it came in the query
 // (images and streams that a player opens as plain URLs).
 func gatewayToken(r *http.Request) (string, bool) {
 	for _, h := range []string{"Authorization", "X-Emby-Authorization"} {
-		if m := mediaBrowserToken.FindStringSubmatch(r.Header.Get(h)); m != nil && m[1] != "" {
-			return m[1], false
+		if m := mediaBrowserToken.FindStringSubmatch(r.Header.Get(h)); m != nil {
+			if t := m[1] + m[2]; t != "" {
+				return t, false
+			}
 		}
 	}
 	for _, h := range []string{"X-Emby-Token", "X-MediaBrowser-Token"} {
