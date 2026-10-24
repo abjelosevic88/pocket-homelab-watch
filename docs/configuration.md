@@ -49,10 +49,10 @@ Core holds their login (service type `jellyfin`: a token, or an API key plus `US
 These belong to the whole box and are also editable by admins under Settings → Services (the environment seeds
 them once). Pocket Watch only ever acts as each person: requests go in as their own Jellyseerr user.
 
-Each can be reached **through Pocket Core** — Watch asks Core for the box owner's own login to the service (Core →
-Settings → My logins; the link "Pocket Watch → <service>" switched on in Core → Links) — or **directly** with the
-address and key below. *Automatic* (the default) tries Core first and falls back to the direct settings, so a Core
-link switched off never takes Watch down. Settings → Services shows which way each one is reached right now.
+On a box with Pocket Core they come **from Core**: the address, the key (the box owner's own login under Core →
+Settings → My logins) and the address people open, each switched on in Core → Links — nothing about them is kept in
+Watch, and the variables below are not needed. *Automatic* (the default) is Core when the box has one, else Direct:
+the variables below and Settings → Services, for a box without Core.
 
 | Variable | Default | What it does |
 |---|---|---|

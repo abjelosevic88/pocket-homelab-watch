@@ -333,18 +333,11 @@ function Notifications() {
 
 // ---------- the box's services (admins) ----------
 
-type SvcStatus = { mode: string; via?: string; url?: string; error?: string }
+type SvcStatus = { mode: string; via?: string; url?: string; public?: string; error?: string }
 
-/** The address and key: shown for Direct; for Automatic only while Core isn't the way in (else folded behind a link). */
-function Fallback({ mode, st, children }: { mode: string; st?: SvcStatus; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  if (mode === 'core' || mode === 'off') return null
-  if (mode === 'direct') return <>{children}</>
-  if (st && st.via !== 'core' && !(st.error && mode === 'off')) return <>{children}</>
-  if (!st) return null
-  return open
-    ? <><p className="muted small" style={{ margin: 0 }}>Used only when Pocket Core can't answer. <button type="button" className="link-btn" onClick={() => setOpen(false)}>Hide</button></p>{children}</>
-    : <p className="muted small" style={{ margin: 0 }}><button type="button" className="link-btn" onClick={() => setOpen(true)}>Direct fallback…</button></p>
+/** The address and key live here only for Direct (a box without Pocket Core); with Core, Core holds them. */
+function Fallback({ mode, children }: { mode: string; st?: SvcStatus; children: React.ReactNode }) {
+  return mode === 'direct' ? <>{children}</> : null
 }
 
 /** One line on how a service is reached right now: through Pocket Core, directly, or why not. */
@@ -352,7 +345,7 @@ function SvcLine({ st }: { st?: SvcStatus }) {
   if (!st) return <p className="svc-line muted small"><span className="dot" />Checking…</p>
   if (st.error && st.mode === 'off') return <p className="svc-line muted small"><span className="dot" />Off</p>
   if (st.error) return <p className="svc-line bad small"><span className="dot" />{st.error}</p>
-  return <p className="svc-line ok small"><span className="dot" />{st.via === 'core' ? 'Connected through Pocket Core' : st.via === 'auto' ? 'Through Pocket Core, or the token when Core can\'t' : 'Connected directly'}{st.url ? <> · <code>{st.url}</code></> : null}</p>
+  return <p className="svc-line ok small"><span className="dot" />{st.via === 'core' ? 'Connected through Pocket Core' : 'Connected directly'}{st.public || st.url ? <> · <code>{st.public || st.url}</code></> : null}</p>
 }
 
 function Services() {
@@ -372,7 +365,7 @@ function Services() {
       <Section title={title} icon={icon} sub={sub} actions={badge && <span className={`badge ${st && !st.error ? 'ok' : st?.error && mode !== 'off' ? 'warn' : ''}`}>{badge}</span>}>
         <div className="stack">
           <Segmented size="sm" value={mode} onChange={v => setF({ ...f, [modeKey]: v })} options={[
-            { value: '', label: 'Automatic', title: 'Pocket Core first, the address below when Core can\'t' },
+            { value: '', label: 'Automatic', title: 'Pocket Core when the box has one, else Direct' },
             { value: 'core', label: 'Pocket Core', disabled: !coreOn, title: coreOn ? 'The login Pocket Core keeps for you (My logins), switched on in Pocket Core → Links' : 'Needs Pocket Core' },
             { value: 'direct', label: 'Direct' }, { value: 'off', label: 'Off' }]} />
           {!coreOn && <CoreHint />}
@@ -383,7 +376,7 @@ function Services() {
               {keyKey && <Field label="API key"><input value={String(f[keyKey] || '')} onChange={e => setF({ ...f, [keyKey]: e.target.value })} autoComplete="off" /></Field>}
             </div>
           </Fallback>
-          {extra}
+          {mode === 'direct' && extra}
           <div className="row"><button type="button" className="btn sm" onClick={() => run(which, '', '')} disabled={mode === 'off'}>Test</button>{status(which)}</div>
         </div>
       </Section>
@@ -391,7 +384,7 @@ function Services() {
   }
   return (
     <div className="stack loose">
-      <p className="muted small">These belong to the whole box. Through Pocket Core, Watch uses the logins Core keeps for you (Pocket Core → Settings → My logins); switch each one on in Pocket Core → Links. Pocket Watch still acts as each person: requests go in as their own Jellyseerr user, and nobody sees anyone else's requests or history.</p>
+      <p className="muted small">These belong to the whole box. With Pocket Core, their addresses and keys live in Core (Pocket Core → Services, and your own logins under Settings → My logins), each switched on in Pocket Core → Links — nothing is kept here. Direct is for a box without Core. Pocket Watch still acts as each person: requests go in as their own Jellyseerr user, and nobody sees anyone else's requests or history.</p>
       {svc('seerr', 'Jellyseerr', 'ticket', 'Discover, requests, and a push when they arrive. People without a Jellyseerr user get one imported from Jellyfin on their first request.', 'seerr_mode', 'seerr_url', 'seerr_key', 'http://jellyseerr:5055',
         <Field label="Address people open (optional)" help="For links to Jellyseerr; the address above may only work inside the box."><input value={f.seerr_public_url || ''} onChange={e => setF({ ...f, seerr_public_url: e.target.value })} placeholder="https://requests.example.com" /></Field>)}
       {svc('sonarr', 'Sonarr', 'tv', 'Upcoming episodes (the calendar only).', 'sonarr_mode', 'sonarr_url', 'sonarr_key', 'http://sonarr:8989')}
@@ -424,8 +417,8 @@ function SubtitlesService({ f, setF, run, status, live }: { f: SettingsT; setF: 
           <Field label="API address" help="As this server reaches it, e.g. http://pocket-subtitles:8080"><input value={f.subtitles_api_url || ''} onChange={e => setF({ ...f, subtitles_api_url: e.target.value })} placeholder="http://pocket-subtitles:8080" /></Field>
           <Field label="API token" help="Pocket Subtitles → Settings → API tokens"><input value={f.subtitles_token || ''} onChange={e => setF({ ...f, subtitles_token: e.target.value })} autoComplete="off" /></Field>
         </div>
-        </Fallback>
         <Field label="Address people open" help="Admins get a link to the file there from the player."><input value={f.subtitles_url || ''} onChange={e => setF({ ...f, subtitles_url: e.target.value })} placeholder="https://subtitles.example.com" /></Field>
+        </Fallback>
         <div className="row"><button type="button" className="btn sm" onClick={() => run('subtitles', mode === 'direct' ? f.subtitles_api_url || '' : '', mode === 'direct' ? f.subtitles_token || '' : '')}>Test</button>{status('subtitles')}</div>
       </div>
     </Section>

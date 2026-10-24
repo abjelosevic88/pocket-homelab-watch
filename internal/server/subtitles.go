@@ -35,13 +35,14 @@ import (
 // subsClient is one way into Pocket Subtitles' API.
 type subsClient struct {
 	base, token, via string
+	public           string // what a browser opens (from Core when through Core)
 	http             *http.Client
 }
 
 var errNoSubs = errors.New("Pocket Subtitles is not connected")
 
-// subsMode is the mode in effect: the one chosen, else "auto" (Core first, then
-// the token) when either is there, else off.
+// subsMode is the mode in effect: the one chosen, else "auto" (Core when the box
+// has one, else the token) when either is there, else off.
 func (s *Server) subsMode(box store.Settings) string {
 	switch box.SubtitlesMode {
 	case "off", "direct", "core":
@@ -70,7 +71,7 @@ func (s *Server) subsFor(ctx context.Context, u *store.User) (*subsClient, error
 		if lt.URL == "" {
 			return nil, errors.New("Pocket Core did not say where Pocket Subtitles is")
 		}
-		return &subsClient{base: strings.TrimRight(lt.URL, "/"), token: lt.AccessToken, via: "core", http: s.http}, nil
+		return &subsClient{base: strings.TrimRight(lt.URL, "/"), token: lt.AccessToken, via: "core", public: strings.TrimRight(lt.PublicURL, "/"), http: s.http}, nil
 	}
 	switch s.subsMode(box) {
 	case "direct":
@@ -79,13 +80,7 @@ func (s *Server) subsFor(ctx context.Context, u *store.User) (*subsClient, error
 		return viaCore()
 	case "auto":
 		if s.core.Configured() {
-			c, err := viaCore()
-			if err == nil {
-				return c, nil
-			}
-			if box.SubtitlesToken == "" {
-				return nil, err
-			}
+			return viaCore()
 		}
 		return direct()
 	}
@@ -246,8 +241,8 @@ func (s *Server) timingOut(ctx context.Context, u *store.User, id string, idx in
 	out["file_ms"] = f.NudgeMS
 	out["pinned"] = f.Pinned
 	out["can_undo"] = f.CanUndo
-	if box.SubtitlesURL != "" && u.Role == "admin" {
-		out["open_url"] = box.SubtitlesURL + "/files/" + strconv.FormatInt(f.ID, 10)
+	if pub := firstNonEmpty(sc.public, box.SubtitlesURL); pub != "" && u.Role == "admin" {
+		out["open_url"] = pub + "/files/" + strconv.FormatInt(f.ID, 10)
 	}
 	return out
 }

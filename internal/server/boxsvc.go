@@ -13,13 +13,13 @@ import (
 
 // ---- the box's services: Jellyseerr, Sonarr, Radarr, Maintainerr ----
 //
-// Each is reached one of two ways, chosen by an admin under Settings →
-// Services: through Pocket Core (the login Core keeps for the box owner — the
-// account the box's services belong to; Core hands apps only a person's own
-// login, never the household key) or directly with an address and key typed
-// in here. Automatic tries Core first and falls back to the direct settings,
-// so switching a Core link off never takes Watch down. Pocket Watch still acts
-// as each person inside the service: requests go in as their own Jellyseerr user.
+// On a box with Pocket Core they come from Core — addresses, keys and public
+// addresses all live there (the login Core keeps for the box owner, the account
+// the box's services belong to; Core hands apps only a person's own login, never
+// the household key). Without Core an admin types an address and key in under
+// Settings → Services (Direct). Automatic = Core when the box has one, else
+// Direct. Pocket Watch still acts as each person inside the service: requests
+// go in as their own Jellyseerr user.
 
 type boxSvc struct {
 	base, public, key, via string // via: core | direct
@@ -115,12 +115,7 @@ func (s *Server) resolveBoxService(ctx context.Context, name string) (*boxSvc, e
 		if cred.URL == "" || (def.needsKey && cred.Key == "") {
 			return nil, errors.New("Pocket Core has " + def.name + " without a login for the box owner (Pocket Core → Settings → My logins)")
 		}
-		b := cred.URL
-		// Core may hand out the public address; inside the box the direct one is faster and needs no TLS
-		if base != "" && (cred.PublicURL == "" || strings.EqualFold(strings.TrimRight(cred.URL, "/"), strings.TrimRight(cred.PublicURL, "/"))) {
-			b = base
-		}
-		return &boxSvc{base: strings.TrimRight(b, "/"), public: strings.TrimRight(firstNonEmpty(public, cred.PublicURL, cred.URL), "/"), key: cred.Key, via: "core"}, nil
+		return &boxSvc{base: strings.TrimRight(cred.URL, "/"), public: strings.TrimRight(firstNonEmpty(cred.PublicURL, cred.URL), "/"), key: cred.Key, via: "core"}, nil
 	}
 	switch mode {
 	case "off":
@@ -131,11 +126,7 @@ func (s *Server) resolveBoxService(ctx context.Context, name string) (*boxSvc, e
 		return viaCore()
 	}
 	if s.core.Configured() {
-		if svc, err := viaCore(); err == nil {
-			return svc, nil
-		} else if base == "" {
-			return nil, err
-		}
+		return viaCore()
 	}
 	return direct()
 }
@@ -157,7 +148,7 @@ func (s *Server) handleServicesStatus(w http.ResponseWriter, r *http.Request) {
 		if svc, err := s.boxService(ctx, name); err != nil {
 			v["error"] = err.Error()
 		} else {
-			v["via"], v["url"] = svc.via, svc.base
+			v["via"], v["url"], v["public"] = svc.via, svc.base, svc.public
 		}
 		out[name] = v
 	}
@@ -165,7 +156,7 @@ func (s *Server) handleServicesStatus(w http.ResponseWriter, r *http.Request) {
 	if c, err := s.subsFor(ctx, userFrom(ctx)); err != nil {
 		sv["error"] = err.Error()
 	} else {
-		sv["via"], sv["url"] = c.via, c.base
+		sv["via"], sv["url"], sv["public"] = c.via, c.base, firstNonEmpty(c.public, st.SubtitlesURL)
 	}
 	out["subtitles"] = sv
 	writeJSON(w, http.StatusOK, out)
