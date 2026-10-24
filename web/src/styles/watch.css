@@ -431,3 +431,5 @@ a.ag-row:hover { background: var(--hover); }
 video::cue { background: rgba(0, 0, 0, .55); color: #fff; font-family: var(--font); line-height: 1.35; }
 .crumb.static { cursor: default; }
 .barlist .bl-row { grid-template-columns: minmax(90px, 170px) minmax(0, 1fr) 128px; }
+body.player-open { overflow: hidden; }
+body.player-open pocket-ask-launcher:not([open]) { display: none; }

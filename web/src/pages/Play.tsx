@@ -44,6 +44,9 @@ export default function Play() {
   const skipped = useRef<Set<number>>(new Set())
   const t0 = Number(new URLSearchParams(loc.search).get('t') ?? '-1')
 
+  // the Pocket Ask pill would sit on the controls: hidden while the player is open
+  useEffect(() => { document.body.classList.add('player-open'); return () => document.body.classList.remove('player-open') }, [])
+
   // ---- loading ----
   const open = useCallback(async (opts: { start: number; audio?: number; subtitle?: number; quality?: string; transcode?: boolean }) => {
     setErr('')
