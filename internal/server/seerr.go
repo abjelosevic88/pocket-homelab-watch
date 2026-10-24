@@ -33,11 +33,11 @@ type seerr struct {
 }
 
 func (s *Server) seerrBox(ctx context.Context) *seerr {
-	st, _ := s.store.GetSettings(ctx, 0)
-	if st.SeerrURL == "" || st.SeerrKey == "" {
+	b, err := s.boxService(ctx, "seerr")
+	if err != nil {
 		return nil
 	}
-	return &seerr{base: strings.TrimRight(st.SeerrURL, "/"), public: firstNonEmpty(st.SeerrPublicURL, st.SeerrURL), key: st.SeerrKey, http: s.http}
+	return &seerr{base: b.base, public: b.public, key: b.key, http: s.http}
 }
 
 func (c *seerr) do(ctx context.Context, method, path, rawQuery string, body, out any) error {

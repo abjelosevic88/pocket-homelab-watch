@@ -40,17 +40,15 @@ type subsClient struct {
 
 var errNoSubs = errors.New("Pocket Subtitles is not connected")
 
-// subsMode is the mode in effect: direct with a token, else Core when the box has one.
+// subsMode is the mode in effect: the one chosen, else "auto" (Core first, then
+// the token) when either is there, else off.
 func (s *Server) subsMode(box store.Settings) string {
 	switch box.SubtitlesMode {
 	case "off", "direct", "core":
 		return box.SubtitlesMode
 	}
-	if box.SubtitlesToken != "" && box.SubtitlesAPIURL != "" {
-		return "direct"
-	}
-	if s.core.Configured() {
-		return "core"
+	if s.core.Configured() || (box.SubtitlesToken != "" && box.SubtitlesAPIURL != "") {
+		return "auto"
 	}
 	return "off"
 }
@@ -58,13 +56,13 @@ func (s *Server) subsMode(box store.Settings) string {
 // subsFor connects to Pocket Subtitles for a person (or says why it can't).
 func (s *Server) subsFor(ctx context.Context, u *store.User) (*subsClient, error) {
 	box, _ := s.store.GetSettings(ctx, 0)
-	switch s.subsMode(box) {
-	case "direct":
+	direct := func() (*subsClient, error) {
 		if box.SubtitlesAPIURL == "" || box.SubtitlesToken == "" {
 			return nil, errors.New("Pocket Subtitles needs an address and a token under Settings → Services")
 		}
 		return &subsClient{base: strings.TrimRight(box.SubtitlesAPIURL, "/"), token: box.SubtitlesToken, via: "direct", http: s.http}, nil
-	case "core":
+	}
+	viaCore := func() (*subsClient, error) {
 		lt, err := s.core.ActAs(ctx, u.Email, "subtitles", "subtitles:sync")
 		if err != nil {
 			return nil, errors.New(coreReason(err, "Pocket Subtitles"))
@@ -73,6 +71,23 @@ func (s *Server) subsFor(ctx context.Context, u *store.User) (*subsClient, error
 			return nil, errors.New("Pocket Core did not say where Pocket Subtitles is")
 		}
 		return &subsClient{base: strings.TrimRight(lt.URL, "/"), token: lt.AccessToken, via: "core", http: s.http}, nil
+	}
+	switch s.subsMode(box) {
+	case "direct":
+		return direct()
+	case "core":
+		return viaCore()
+	case "auto":
+		if s.core.Configured() {
+			c, err := viaCore()
+			if err == nil {
+				return c, nil
+			}
+			if box.SubtitlesToken == "" {
+				return nil, err
+			}
+		}
+		return direct()
 	}
 	return nil, errNoSubs
 }

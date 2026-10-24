@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -275,4 +276,28 @@ func TestSubtitleTiming(t *testing.T) {
 	if r := call(t, h, ana, "GET", "/api/v1/play/"+movieID+"/subtitles/9", ""); r.Code != http.StatusNotFound {
 		t.Fatalf("unknown track: %d", r.Code)
 	}
+}
+
+// Without Core the box's services come from the saved address and key; Off means off.
+func TestBoxServiceDirect(t *testing.T) {
+	s, _, _, _ := testServer(t)
+	ctx := context.Background()
+	if _, err := s.boxService(ctx, "sonarr"); err == nil {
+		t.Fatal("sonarr without an address should not resolve")
+	}
+	box, _ := s.store.GetSettings(ctx, 0)
+	box.SonarrURL, box.SonarrKey = "http://sonarr:8989/", "k"
+	_ = s.store.SaveBoxSettings(ctx, box)
+	forgetBoxServices()
+	b, err := s.boxService(ctx, "sonarr")
+	if err != nil || b.via != "direct" || b.base != "http://sonarr:8989" || b.key != "k" {
+		t.Fatalf("sonarr = %+v, %v", b, err)
+	}
+	box.SonarrMode = "off"
+	_ = s.store.SaveBoxSettings(ctx, box)
+	forgetBoxServices()
+	if _, err := s.boxService(ctx, "sonarr"); !errors.Is(err, errBoxOff) {
+		t.Fatalf("off: %v", err)
+	}
+	forgetBoxServices()
 }

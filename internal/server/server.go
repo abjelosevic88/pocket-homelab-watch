@@ -357,6 +357,10 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 			{App: "subtitles", Scopes: []string{"subtitles:sync"}, Reason: "Save a subtitle's timing into the file when you fix it while watching, so everyone gets it"}},
 		Services: []core.ServiceUse{
 			{Type: "jellyfin", Reason: "Your films and shows: Pocket Watch plays them with your own Jellyfin account, so resume points and watched marks stay yours"},
+			{Type: "jellyseerr", Reason: "Discover and requests (the box owner's login; each person requests as their own Jellyseerr user)"},
+			{Type: "sonarr", Reason: "Upcoming episodes (reads the calendar)"},
+			{Type: "radarr", Reason: "Upcoming films (reads the calendar)"},
+			{Type: "maintainerr", Reason: "Leaving soon: what a cleanup rule will remove"},
 		},
 	}
 	if s.cfg.BaseURL != "" {

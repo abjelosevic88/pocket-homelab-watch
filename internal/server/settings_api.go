@@ -41,7 +41,7 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		"notify_url": st.NotifyURL, "notify_format": st.NotifyFormat, "notify_available": st.NotifyAvailable, "notify_weekly": st.NotifyWeekly, "notify_configured": st.NotifyURL != "",
 		"ai_provider": st.AIProvider, "ai_pocket_model": st.AIPocketModel, "openai_api_key": mask(st.OpenAIKey), "openai_model": st.OpenAIModel, "openai_base_url": st.OpenAIBaseURL,
 		"setup_complete": st.SetupComplete, "base_url": s.cfg.BaseURL, "jellyfin_url": s.cfg.JellyfinURL != "", "jellyfin_public_url": s.cfg.JellyfinPublicURL,
-		"requests": st.SeerrURL != "" && st.SeerrKey != "", "upcoming": (st.SonarrURL != "" && st.SonarrKey != "") || (st.RadarrURL != "" && st.RadarrKey != ""),
+		"requests": s.boxUp(ctx, "seerr"), "upcoming": s.boxUp(ctx, "sonarr") || s.boxUp(ctx, "radarr"),
 		"seerr_link": firstNonEmpty(st.SeerrPublicURL, st.SeerrURL),
 	}
 	if u != nil && u.Role == "admin" {
@@ -51,6 +51,7 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		out["maintainerr_url"], out["subtitles_url"] = st.MaintainerrURL, st.SubtitlesURL
 		out["subtitles_mode"], out["subtitles_api_url"], out["subtitles_token"] = st.SubtitlesMode, st.SubtitlesAPIURL, mask(st.SubtitlesToken)
 		out["subtitles_mode_effective"] = s.subsMode(st)
+		out["seerr_mode"], out["sonarr_mode"], out["radarr_mode"], out["maintainerr_mode"] = st.SeerrMode, st.SonarrMode, st.RadarrMode, st.MaintainerrMode
 	}
 	return out
 }
@@ -154,9 +155,16 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		url("maintainerr_url", &cur.MaintainerrURL, in.MaintainerrURL)
 		url("subtitles_url", &cur.SubtitlesURL, in.SubtitlesURL)
 		oneOf("subtitles_mode", &cur.SubtitlesMode, in.SubtitlesMode, "", "core", "direct", "off")
+		oneOf("seerr_mode", &cur.SeerrMode, in.SeerrMode, "", "core", "direct", "off")
+		oneOf("sonarr_mode", &cur.SonarrMode, in.SonarrMode, "", "core", "direct", "off")
+		oneOf("radarr_mode", &cur.RadarrMode, in.RadarrMode, "", "core", "direct", "off")
+		oneOf("maintainerr_mode", &cur.MaintainerrMode, in.MaintainerrMode, "", "core", "direct", "off")
 		url("subtitles_api_url", &cur.SubtitlesAPIURL, in.SubtitlesAPIURL)
 		secret("subtitles_token", &cur.SubtitlesToken, in.SubtitlesToken)
 		boxChanged = before != cur
+		if boxChanged {
+			forgetBoxServices()
+		}
 		if before.MaintainerrURL != cur.MaintainerrURL {
 			_ = s.store.CacheDelete(r.Context(), "maintainerr:")
 		}
@@ -253,36 +261,45 @@ func (s *Server) handleIntegrationTest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		box, _ := s.store.GetSettings(ctx, 0)
+		// typed into the form: test exactly that; else whatever is in use now (Core or the saved address)
+		dBase, _, dKey, _ := boxDirect(box, in.Which)
+		target := &boxSvc{base: urlOr(dBase), key: keyOr(dKey), via: "direct"}
+		if strings.TrimSpace(in.URL) == "" && (in.Key == "" || strings.Contains(in.Key, "••")) {
+			forgetBoxServices()
+			if target, err = s.boxService(ctx, in.Which); err != nil {
+				break
+			}
+		}
+		how := " (directly)"
+		if target.via == "core" {
+			how = " (through Pocket Core)"
+		}
 		switch in.Which {
 		case "seerr":
-			c := &seerr{base: urlOr(box.SeerrURL), key: keyOr(box.SeerrKey), http: s.http}
+			c := &seerr{base: target.base, key: target.key, http: s.http}
 			var st struct {
 				Version string `json:"version"`
 			}
 			if err = c.do(ctx, http.MethodGet, "/settings/main", "", nil, nil); err == nil {
 				_ = c.do(ctx, http.MethodGet, "/status", "", nil, &st)
-				msg = "Jellyseerr " + st.Version + " answers and accepts the key"
+				msg = "Jellyseerr " + st.Version + " answers and accepts the key" + how
 			}
 		case "sonarr", "radarr":
-			base, key := box.SonarrURL, box.SonarrKey
-			if in.Which == "radarr" {
-				base, key = box.RadarrURL, box.RadarrKey
-			}
 			var st struct {
 				Version string `json:"version"`
 				AppName string `json:"appName"`
 			}
-			if err = s.arrGet(ctx, urlOr(base), keyOr(key), "/system/status", nil, &st); err == nil {
-				msg = fmt.Sprintf("%s %s answers", firstNonEmpty(st.AppName, in.Which), st.Version)
+			if err = s.arrGet(ctx, target.base, target.key, "/system/status", nil, &st); err == nil {
+				msg = fmt.Sprintf("%s %s answers%s", firstNonEmpty(st.AppName, in.Which), st.Version, how)
 			}
 		case "maintainerr":
 			var cols []json.RawMessage
-			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, urlOr(box.MaintainerrURL)+"/api/collections", nil)
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, target.base+"/api/collections", nil)
 			var res *http.Response
 			if res, err = s.http.Do(req); err == nil {
 				err = json.NewDecoder(res.Body).Decode(&cols)
 				res.Body.Close()
-				msg = fmt.Sprintf("Maintainerr answers: %d collections", len(cols))
+				msg = fmt.Sprintf("Maintainerr answers: %d collections%s", len(cols), how)
 			}
 		}
 	case "openai":

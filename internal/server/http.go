@@ -109,6 +109,7 @@ func (s *Server) Router() http.Handler {
 				r.Get("/ai/status", s.handleAIStatus)
 				r.Get("/ai/models", s.handleAIModels)
 				r.Post("/integrations/test", s.handleIntegrationTest)
+				r.Get("/services/status", s.handleServicesStatus)
 
 				r.Get("/users", s.handleListUsers)
 				r.Post("/users", s.handleCreateUser)

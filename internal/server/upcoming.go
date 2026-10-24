@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -73,9 +74,10 @@ func (s *Server) arrGet(ctx context.Context, base, key, path string, q url.Value
 func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	u := userFrom(ctx)
-	box, _ := s.store.GetSettings(ctx, 0)
 	st, _ := s.store.GetSettings(ctx, u.ID)
-	if (box.SonarrURL == "" || box.SonarrKey == "") && (box.RadarrURL == "" || box.RadarrKey == "") {
+	son, sonErr := s.boxService(ctx, "sonarr")
+	rad, radErr := s.boxService(ctx, "radarr")
+	if son == nil && rad == nil {
 		writeJSON(w, http.StatusOK, map[string]any{"items": []Upcoming{}, "configured": false})
 		return
 	}
@@ -127,7 +129,13 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 	}
 	var out []Upcoming
 	var problems []string
-	if box.SonarrURL != "" && box.SonarrKey != "" {
+	if sonErr != nil && !errors.Is(sonErr, errBoxOff) && !strings.HasPrefix(sonErr.Error(), "not set up") {
+		problems = append(problems, "Sonarr: "+sonErr.Error())
+	}
+	if radErr != nil && !errors.Is(radErr, errBoxOff) && !strings.HasPrefix(radErr.Error(), "not set up") {
+		problems = append(problems, "Radarr: "+radErr.Error())
+	}
+	if son != nil {
 		var eps []struct {
 			Title         string `json:"title"`
 			SeasonNumber  int    `json:"seasonNumber"`
@@ -142,7 +150,7 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 			} `json:"series"`
 		}
 		qs := url.Values{"start": q["start"], "end": q["end"], "includeSeries": {"true"}, "unmonitored": {"false"}}
-		if err := s.arrGet(ctx, box.SonarrURL, box.SonarrKey, "/calendar", qs, &eps); err != nil {
+		if err := s.arrGet(ctx, son.base, son.key, "/calendar", qs, &eps); err != nil {
 			problems = append(problems, "Sonarr: "+err.Error())
 		}
 		for _, e := range eps {
@@ -157,7 +165,7 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if box.RadarrURL != "" && box.RadarrKey != "" {
+	if rad != nil {
 		var films []struct {
 			Title           string     `json:"title"`
 			Year            int        `json:"year"`
@@ -168,7 +176,7 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 			HasFile         bool       `json:"hasFile"`
 			Images          []arrImage `json:"images"`
 		}
-		if err := s.arrGet(ctx, box.RadarrURL, box.RadarrKey, "/calendar", url.Values{"start": q["start"], "end": q["end"], "unmonitored": {"false"}}, &films); err != nil {
+		if err := s.arrGet(ctx, rad.base, rad.key, "/calendar", url.Values{"start": q["start"], "end": q["end"], "unmonitored": {"false"}}, &films); err != nil {
 			problems = append(problems, "Radarr: "+err.Error())
 		}
 		for _, f := range films {
@@ -206,8 +214,8 @@ type leaving struct {
 
 // leavingSoon lists library items Maintainerr will remove, with the day (cached 10 minutes).
 func (s *Server) leavingSoon(ctx context.Context, jc *jfConn) []leaving {
-	box, _ := s.store.GetSettings(ctx, 0)
-	if box.MaintainerrURL == "" {
+	mt, err := s.boxService(ctx, "maintainerr")
+	if err != nil {
 		return nil
 	}
 	const key = "maintainerr:leaving"
@@ -225,7 +233,7 @@ func (s *Server) leavingSoon(ctx context.Context, jc *jfConn) []leaving {
 	}
 	cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(cctx, http.MethodGet, strings.TrimRight(box.MaintainerrURL, "/")+"/api/collections", nil)
+	req, _ := http.NewRequestWithContext(cctx, http.MethodGet, mt.base+"/api/collections", nil)
 	res, err := s.http.Do(req)
 	if err != nil {
 		return nil

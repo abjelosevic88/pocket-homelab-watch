@@ -468,3 +468,8 @@ body.player-open pocket-ask-launcher:not([open]) { display: none; }
 .tm-save { flex-shrink: 0; min-width: 96px; justify-content: center; }
 .tm-links { display: flex; gap: 14px; justify-content: flex-end; margin-top: -2px; }
 .player-osd { position: absolute; left: 50%; top: calc(76px + env(safe-area-inset-top)); transform: translateX(-50%); padding: 8px 16px; border-radius: 999px; background: rgba(20, 20, 26, .8); backdrop-filter: blur(10px); font-weight: 650; font-variant-numeric: tabular-nums; z-index: 7; pointer-events: none; }
+.svc-line { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: 8px 11px; border-radius: 9px; background: var(--surface-2); line-height: 1.45; overflow-wrap: anywhere; }
+.svc-line .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex-shrink: 0; margin-top: 5px; }
+.svc-line.ok .dot { background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
+.svc-line.bad .dot { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-soft); }
+.svc-line code { font-size: 12px; }

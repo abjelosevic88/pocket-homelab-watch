@@ -333,42 +333,71 @@ function Notifications() {
 
 // ---------- the box's services (admins) ----------
 
+type SvcStatus = { mode: string; via?: string; url?: string; error?: string }
+
+/** One line on how a service is reached right now: through Pocket Core, directly, or why not. */
+function SvcLine({ st }: { st?: SvcStatus }) {
+  if (!st) return <p className="svc-line muted small"><span className="dot" />Checking…</p>
+  if (st.error && st.mode === 'off') return <p className="svc-line muted small"><span className="dot" />Off</p>
+  if (st.error) return <p className="svc-line bad small"><span className="dot" />{st.error}</p>
+  return <p className="svc-line ok small"><span className="dot" />{st.via === 'core' ? 'Connected through Pocket Core' : st.via === 'auto' ? 'Through Pocket Core, or the token when Core can\'t' : 'Connected directly'}{st.url ? <> · <code>{st.url}</code></> : null}</p>
+}
+
 function Services() {
-  const { f, setF, save, busy } = useSettingsForm()
+  const { f, setF, save: saveRaw, busy } = useSettingsForm()
   const { run, status } = useTester()
+  const [live, setLive] = useState<Record<string, SvcStatus> | null>(null)
+  const load = (fresh = false) => api.get<Record<string, SvcStatus>>(`${V1}/services/status${fresh ? '?fresh=1' : ''}`).then(setLive).catch(() => setLive({}))
+  useEffect(() => { load() }, [])
   if (!f) return <Loading />
-  const svc = (which: string, title: string, icon: string, sub: React.ReactNode, urlKey: keyof SettingsT, keyKey: keyof SettingsT | null, placeholder: string, extra?: React.ReactNode) => (
-    <Section title={title} icon={icon} sub={sub} actions={<span className={`badge ${f[urlKey] ? 'ok' : ''}`}>{f[urlKey] ? 'on' : 'off'}</span>}>
-      <div className="stack">
-        <div className={keyKey ? 'two-col' : ''}>
-          <Field label="Address"><input value={String(f[urlKey] || '')} onChange={e => setF({ ...f, [urlKey]: e.target.value })} placeholder={placeholder} /></Field>
-          {keyKey && <Field label="API key"><input value={String(f[keyKey] || '')} onChange={e => setF({ ...f, [keyKey]: e.target.value })} autoComplete="off" /></Field>}
+  const save = async () => { await saveRaw(); setLive(null); load(true) }
+  const coreOn = f.core_configured && f.core_registered !== false
+  const svc = (which: string, title: string, icon: string, sub: React.ReactNode, modeKey: keyof SettingsT, urlKey: keyof SettingsT, keyKey: keyof SettingsT | null, placeholder: string, extra?: React.ReactNode) => {
+    const mode = String(f[modeKey] || '')
+    const st = live?.[which]
+    const badge = !st ? '' : st.error ? (mode === 'off' ? 'off' : 'not connected') : st.via === 'core' ? 'Pocket Core' : 'direct'
+    return (
+      <Section title={title} icon={icon} sub={sub} actions={badge && <span className={`badge ${st && !st.error ? 'ok' : st?.error && mode !== 'off' ? 'warn' : ''}`}>{badge}</span>}>
+        <div className="stack">
+          <Segmented size="sm" value={mode} onChange={v => setF({ ...f, [modeKey]: v })} options={[
+            { value: '', label: 'Automatic', title: 'Pocket Core first, the address below when Core can\'t' },
+            { value: 'core', label: 'Pocket Core', disabled: !coreOn, title: coreOn ? 'The login Pocket Core keeps for you (My logins), switched on in Pocket Core → Links' : 'Needs Pocket Core' },
+            { value: 'direct', label: 'Direct' }, { value: 'off', label: 'Off' }]} />
+          {!coreOn && <CoreHint />}
+          <SvcLine st={st} />
+          {mode !== 'core' && mode !== 'off' && <>
+            {mode === '' && coreOn && <p className="muted small" style={{ margin: 0 }}>Used when Pocket Core can't answer:</p>}
+            <div className={keyKey ? 'two-col' : ''}>
+              <Field label="Address"><input value={String(f[urlKey] || '')} onChange={e => setF({ ...f, [urlKey]: e.target.value })} placeholder={placeholder} /></Field>
+              {keyKey && <Field label="API key"><input value={String(f[keyKey] || '')} onChange={e => setF({ ...f, [keyKey]: e.target.value })} autoComplete="off" /></Field>}
+            </div>
+          </>}
+          {extra}
+          <div className="row"><button type="button" className="btn sm" onClick={() => run(which, '', '')} disabled={mode === 'off'}>Test</button>{status(which)}</div>
         </div>
-        {extra}
-        {which && <div className="row"><button type="button" className="btn sm" onClick={() => run(which, String(f[urlKey] || ''), keyKey ? String(f[keyKey] || '') : '')} disabled={!f[urlKey]}>Test</button>{status(which)}</div>}
-      </div>
-    </Section>
-  )
+      </Section>
+    )
+  }
   return (
     <div className="stack loose">
-      <p className="muted small">These belong to the whole box. Pocket Watch only ever acts as each person: requests go in as their own Jellyseerr user, and nobody sees anyone else's requests or history.</p>
-      {svc('seerr', 'Jellyseerr', 'ticket', 'Discover, requests, and a push when they arrive. People without a Jellyseerr user get one imported from Jellyfin on their first request.', 'seerr_url', 'seerr_key', 'http://jellyseerr:5055',
-        <Field label="Address people open (optional)" help="When the address above only works inside the box."><input value={f.seerr_public_url || ''} onChange={e => setF({ ...f, seerr_public_url: e.target.value })} placeholder="https://requests.example.com" /></Field>)}
-      {svc('sonarr', 'Sonarr', 'tv', 'Upcoming episodes (the calendar only).', 'sonarr_url', 'sonarr_key', 'http://sonarr:8989')}
-      {svc('radarr', 'Radarr', 'film', 'Upcoming films: cinema, digital and disc releases.', 'radarr_url', 'radarr_key', 'http://radarr:7878')}
-      {svc('maintainerr', 'Maintainerr', 'hourglass', '“Leaving soon”: titles a cleanup rule will remove, with the day.', 'maintainerr_url', null, 'http://maintainerr:6246')}
-      <SubtitlesService f={f} setF={setF} run={run} status={status} />
-      <div className="row"><button type="button" className="btn primary" onClick={() => save()} disabled={busy}>Save changes</button></div>
+      <p className="muted small">These belong to the whole box. Through Pocket Core, Watch uses the logins Core keeps for you (Pocket Core → Settings → My logins); switch each one on in Pocket Core → Links. Pocket Watch still acts as each person: requests go in as their own Jellyseerr user, and nobody sees anyone else's requests or history.</p>
+      {svc('seerr', 'Jellyseerr', 'ticket', 'Discover, requests, and a push when they arrive. People without a Jellyseerr user get one imported from Jellyfin on their first request.', 'seerr_mode', 'seerr_url', 'seerr_key', 'http://jellyseerr:5055',
+        <Field label="Address people open (optional)" help="For links to Jellyseerr; the address above may only work inside the box."><input value={f.seerr_public_url || ''} onChange={e => setF({ ...f, seerr_public_url: e.target.value })} placeholder="https://requests.example.com" /></Field>)}
+      {svc('sonarr', 'Sonarr', 'tv', 'Upcoming episodes (the calendar only).', 'sonarr_mode', 'sonarr_url', 'sonarr_key', 'http://sonarr:8989')}
+      {svc('radarr', 'Radarr', 'film', 'Upcoming films: cinema, digital and disc releases.', 'radarr_mode', 'radarr_url', 'radarr_key', 'http://radarr:7878')}
+      {svc('maintainerr', 'Maintainerr', 'hourglass', '“Leaving soon”: titles a cleanup rule will remove, with the day.', 'maintainerr_mode', 'maintainerr_url', null, 'http://maintainerr:6246')}
+      <SubtitlesService f={f} setF={setF} run={run} status={status} live={live?.subtitles} />
+      <div className="row"><button type="button" className="btn primary" onClick={save} disabled={busy}>Save changes</button></div>
     </div>
   )
 }
 
-function SubtitlesService({ f, setF, run, status }: { f: SettingsT; setF: (s: SettingsT) => void; run: (which: string, url: string, key: string) => void; status: (which: string) => React.ReactNode }) {
+function SubtitlesService({ f, setF, run, status, live }: { f: SettingsT; setF: (s: SettingsT) => void; run: (which: string, url: string, key: string) => void; status: (which: string) => React.ReactNode; live?: SvcStatus }) {
   const coreOn = f.core_configured && f.core_registered !== false
   const mode = f.subtitles_mode || ''
   const eff = f.subtitles_mode_effective || 'off'
   return (
-    <Section title="Pocket Subtitles" icon="cc" actions={<span className={`badge ${eff !== 'off' ? 'ok' : ''}`}>{eff === 'core' ? 'through Pocket Core' : eff === 'direct' ? 'with a token' : 'off'}</span>}
+    <Section title="Pocket Subtitles" icon="cc" actions={<span className={`badge ${eff !== 'off' && !live?.error ? 'ok' : live?.error ? 'warn' : ''}`}>{eff === 'core' ? 'Pocket Core' : eff === 'direct' ? 'token' : eff === 'auto' ? 'automatic' : 'off'}</span>}
       sub="While watching, anyone can move a subtitle track earlier or later for themselves. With Pocket Subtitles connected they can also save that timing into the .srt file for everyone: it shifts every line, pins the file so the nightly sync keeps it, and keeps a backup for undo.">
       <div className="stack">
         <Field group label="How Watch reaches it">
@@ -378,7 +407,8 @@ function SubtitlesService({ f, setF, run, status }: { f: SettingsT; setF: (s: Se
             { value: 'direct', label: 'Token' }, { value: 'off', label: 'Off' }]} />
         </Field>
         {!coreOn && <CoreHint />}
-        <p className="muted small" style={{ margin: 0 }}>Automatic uses the token when one is set, else Pocket Core (each person acts as themselves; the link “Pocket Watch → Pocket Subtitles” has to be switched on in Pocket Core → Links).</p>
+        <SvcLine st={live} />
+        <p className="muted small" style={{ margin: 0 }}>Automatic goes through Pocket Core as each person (switch “Pocket Watch → Pocket Subtitles” on in Pocket Core → Links) and uses the token while Core can't.</p>
         <div className="two-col">
           <Field label="API address" help="As this server reaches it, e.g. http://pocket-subtitles:8080"><input value={f.subtitles_api_url || ''} onChange={e => setF({ ...f, subtitles_api_url: e.target.value })} placeholder="http://pocket-subtitles:8080" /></Field>
           <Field label="API token" help="Pocket Subtitles → Settings → API tokens"><input value={f.subtitles_token || ''} onChange={e => setF({ ...f, subtitles_token: e.target.value })} autoComplete="off" /></Field>

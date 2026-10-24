@@ -13,7 +13,8 @@ const DefaultTitle = "Pocket Watch"
 var boxKeys = map[string]bool{"title": true, "setup_complete": true,
 	"seerr_url": true, "seerr_public_url": true, "seerr_key": true, "sonarr_url": true, "sonarr_key": true,
 	"radarr_url": true, "radarr_key": true, "maintainerr_url": true, "subtitles_url": true,
-	"subtitles_mode": true, "subtitles_api_url": true, "subtitles_token": true}
+	"subtitles_mode": true, "subtitles_api_url": true, "subtitles_token": true,
+	"seerr_mode": true, "sonarr_mode": true, "radarr_mode": true, "maintainerr_mode": true}
 
 // defaults returns the settings a person starts with.
 func (s *Store) defaults() Settings {
