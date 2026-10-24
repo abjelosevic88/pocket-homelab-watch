@@ -1,0 +1,7 @@
+# Pocket Watch behind Caddy. Video streams and HLS segments are long requests:
+# no timeouts and no buffering here.
+watch.example.com {
+	reverse_proxy pocket-watch:8080 {
+		flush_interval -1
+	}
+}

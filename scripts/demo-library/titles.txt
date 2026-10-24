@@ -1,0 +1,25 @@
+# kind|title|year|minutes (episodes: show|year|season|count|minutes)
+movie|Big Buck Bunny|2008|10
+movie|Sintel|2010|15
+movie|Tears of Steel|2012|12
+movie|Elephants Dream|2006|11
+movie|Cosmos Laundromat|2015|12
+movie|Spring|2019|8
+movie|Sprite Fright|2021|10
+movie|Charge|2022|4
+movie|Agent 327: Operation Barbershop|2017|4
+movie|Caminandes 3: Llamigos|2016|3
+movie|Nosferatu|1922|94
+movie|The General|1926|78
+movie|Metropolis|1927|153
+movie|Sherlock Jr.|1924|45
+movie|The Kid|1921|68
+movie|The Cabinet of Dr. Caligari|1920|76
+movie|Safety Last!|1923|70
+movie|The Gold Rush|1925|95
+movie|A Trip to the Moon|1902|14
+movie|The Phantom of the Opera|1925|93
+movie|Battleship Potemkin|1925|75
+show|Pioneer One|2010|1|6|35
+show|Bonanza|1959|1|8|50
+show|One Step Beyond|1959|1|8|25

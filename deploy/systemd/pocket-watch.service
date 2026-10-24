@@ -1,0 +1,24 @@
+[Unit]
+Description=Pocket Watch — films and shows for the household, on top of Jellyfin
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=pocket-watch
+Group=pocket-watch
+ExecStart=/usr/local/bin/pocket-watch
+Environment=DATA_DIR=/var/lib/pocket-watch
+Environment=PORT=8080
+Environment=BASE_URL=https://watch.example.com
+Environment=JELLYFIN_URL=http://127.0.0.1:8096
+Environment=SECURE_COOKIES=true
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pocket-watch
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
