@@ -185,6 +185,10 @@ func tmdbImg(path, size string) string {
 	if path == "" {
 		return ""
 	}
+	// Pocket Requests (standing in for Jellyseerr) sends shows' TheTVDB artwork as full URLs
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path
+	}
 	return "https://image.tmdb.org/t/p/" + size + path
 }
 
