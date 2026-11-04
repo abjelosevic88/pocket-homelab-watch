@@ -334,6 +334,30 @@ func (c *Client) AddVirtualFolder(ctx context.Context, name, collectionType, pat
 	return c.do(ctx, http.MethodPost, "/Library/VirtualFolders", q, map[string]any{"LibraryOptions": map[string]any{"EnableRealtimeMonitor": true}}, nil)
 }
 
+// ScanEvery makes the library scan (the "Scan Media Library" task) run every d,
+// in place of its triggers.
+func (c *Client) ScanEvery(ctx context.Context, d time.Duration) error {
+	var tasks []struct {
+		ID  string `json:"Id"`
+		Key string `json:"Key"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/ScheduledTasks", nil, nil, &tasks); err != nil {
+		return err
+	}
+	for _, t := range tasks {
+		if t.Key == "RefreshLibrary" {
+			return c.do(ctx, http.MethodPost, "/ScheduledTasks/"+url.PathEscape(t.ID)+"/Triggers", nil,
+				[]map[string]any{{"Type": "IntervalTrigger", "IntervalTicks": d.Nanoseconds() / 100}}, nil)
+		}
+	}
+	return errors.New("Jellyfin has no library scan task")
+}
+
+// ScanLibrary starts a library scan now.
+func (c *Client) ScanLibrary(ctx context.Context) error {
+	return c.do(ctx, http.MethodPost, "/Library/Refresh", nil, nil, nil)
+}
+
 // ---- items ----
 
 // UserData is a person's state for one item.

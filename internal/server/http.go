@@ -67,6 +67,7 @@ func (s *Server) Router() http.Handler {
 				r.Put("/connection", s.handleConnect)
 				r.Post("/connection/quick-connect", s.handleQuickConnectStart)
 				r.Get("/connection/quick-connect", s.handleQuickConnectPoll)
+				r.Post("/connection/scan", s.handleBundledScan)
 				r.Get("/sync", s.handleSyncStatus)
 				r.Post("/sync", s.handleSyncNow)
 

@@ -104,7 +104,8 @@ COMPOSE_PROFILES=jellyfin docker compose up -d    # or put COMPOSE_PROFILES=jell
 ```
 
 Open it and create the first account; Jellyfin is ready a minute later. Films go in `media/movies`, shows in
-`media/shows` (`Show Name/Season 01/…`), and appear within minutes. Jellyfin has no port of its own; publish
+`media/shows` (`Show Name/Season 01/…`); Jellyfin looks for new files every 15 minutes (or Settings → Jellyfin →
+Scan for new files). Jellyfin has no port of its own; publish
 `8096` in the compose file for Jellyfin's TV apps and dashboard (user `pocket-watch`, the password is under Settings
 → Jellyfin for admins). With Pocket Core, Core → Apps → Install app does all of this; to switch to your own
 Jellyfin later, remove `COMPOSE_PROFILES` from its `.env`, set `JELLYFIN_URL`, then `docker compose stop jellyfin`

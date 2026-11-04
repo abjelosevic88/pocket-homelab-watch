@@ -173,7 +173,8 @@ function JellyfinAccount() {
           </div>
           {mode === 'bundled' && c.bundled_admin && (
             <div className="stack">
-              <p className="muted small">Films go in <code>media/movies</code> and shows in <code>media/shows</code>, next to Pocket Watch's <code>docker-compose.yml</code> (or the folders set as <code>MOVIES_DIR</code> and <code>SHOWS_DIR</code>). New files show up within minutes.</p>
+              <p className="muted small">Films go in <code>media/movies</code> and shows in <code>media/shows</code>, next to Pocket Watch's <code>docker-compose.yml</code> (or the folders set as <code>MOVIES_DIR</code> and <code>SHOWS_DIR</code>). Jellyfin looks for new files every 15 minutes.</p>
+              <div className="row"><button type="button" className="btn sm" onClick={() => api.post(`${V1}/connection/scan`).then(() => toast('Looking for new files — they appear in a minute or two')).catch(e => toast(errMsg(e), 'err'))}><Icon name="refresh" size={14} />Scan for new files</button></div>
               <p className="muted small">Jellyfin's own dashboard (publish its port in the compose file first): user <code>{c.bundled_admin.user}</code>, password {showPw ? <code>{c.bundled_admin.password}</code> : <button type="button" className="link-btn" onClick={() => setShowPw(true)}>show</button>}</p>
             </div>
           )}

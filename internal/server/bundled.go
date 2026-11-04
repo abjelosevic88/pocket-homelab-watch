@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,8 +36,13 @@ const (
 	kvBundledAdmin = "bundled:admin"     // sealed password of the administrator
 	kvBundledKey   = "bundled:key"       // sealed API key
 	kvBundledLibs  = "bundled:libraries" // the first libraries were added
+	kvBundledScan  = "bundled:scan"      // the library scan runs every bundledScanEvery
 	kvBundledUser  = "bundled:user:"     // + person id → Jellyfin user id NUL name
 )
+
+// bundledScanEvery: Jellyfin's real-time monitor misses files copied into a
+// container's bind mount, so the library scan runs often (unchanged files are cheap).
+const bundledScanEvery = 15 * time.Minute
 
 // bundledLibraries are made on a fresh server, over the compose file's mounts.
 var bundledLibraries = []struct{ name, kind, path string }{
@@ -179,6 +185,13 @@ func (s *Server) setupBundled(ctx context.Context) error {
 		}
 		_ = s.store.CachePut(ctx, kvBundledLibs, "1")
 	}
+	if _, _, done := s.store.CacheGet(ctx, kvBundledScan); !done {
+		if err := jc.ScanEvery(ctx, bundledScanEvery); err != nil {
+			s.log.Warn("bundled jellyfin scan schedule", "err", err)
+		} else {
+			_ = s.store.CachePut(ctx, kvBundledScan, "1")
+		}
+	}
 	s.setBundled(key, "")
 	return nil
 }
@@ -274,4 +287,27 @@ func bundledName(u *store.User) string {
 		n = "Person " + strconv.FormatInt(u.ID, 10)
 	}
 	return n
+}
+
+// handleBundledScan looks for new files now (admins, the bundled Jellyfin).
+func (s *Server) handleBundledScan(w http.ResponseWriter, r *http.Request) {
+	if !s.requireAdmin(w, r) {
+		return
+	}
+	if !s.bundledOn() {
+		writeErr(w, http.StatusNotFound, "Pocket Watch did not come with its own Jellyfin here")
+		return
+	}
+	key, state := s.bundledKey()
+	if key == "" {
+		writeErr(w, http.StatusConflict, firstNonEmpty(state, "Jellyfin is starting"))
+		return
+	}
+	jc := jellyfin.New(s.cfg.JellyfinURL, key, "", "pocket-watch")
+	jc.Version = Version
+	if err := jc.ScanLibrary(r.Context()); err != nil {
+		s.jfErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true})
 }

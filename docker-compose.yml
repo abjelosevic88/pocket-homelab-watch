@@ -57,7 +57,7 @@ services:
 
   # Jellyfin, the official image (the "jellyfin" profile). Put films in MOVIES_DIR
   # and shows in SHOWS_DIR (default: media/movies and media/shows next to this
-  # file); Jellyfin notices new files by itself.
+  # file); Jellyfin looks for new ones every 15 minutes.
   jellyfin:
     image: jellyfin/jellyfin:latest
     container_name: pocket-watch-jellyfin
