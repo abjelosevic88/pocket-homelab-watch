@@ -58,6 +58,8 @@ type Server struct {
 
 	jobsMu sync.Mutex
 	jobs   map[string]bool // background jobs running
+
+	bundled bundledState // the Jellyfin that comes with Pocket Watch
 }
 
 // New creates a server.
@@ -111,6 +113,9 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	}
 	_ = s.store.PurgeSessions(ctx)
 	go s.janitor(ctx)
+	if s.cfg.JellyfinBundled {
+		go s.bundledLoop(ctx)
+	}
 	if s.core.Configured() {
 		go s.coreLoop(ctx)
 	}

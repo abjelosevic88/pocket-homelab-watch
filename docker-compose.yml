@@ -1,4 +1,13 @@
-# Pocket Watch — films and shows for the household on top of Jellyfin. Go + SQLite. One container, one volume.
+# Pocket Watch — films and shows for the household on top of Jellyfin. Go + SQLite.
+# `docker compose up -d` starts both: the app, and Jellyfin, which Pocket Watch
+# sets up by itself on the first start (an administrator, an API key, Films and
+# Shows libraries over the two folders below) and where everyone who uses
+# Pocket Watch gets an account of their own. Jellyfin has no port of its own:
+# only the app reaches it.
+#
+# Already have a Jellyfin? Delete the `jellyfin` service and `depends_on`, set
+# JELLYFIN_BUNDLED to "false" and JELLYFIN_URL to yours; everyone then signs in
+# with their own Jellyfin account under Settings → Jellyfin.
 services:
   pocket-watch:
     image: ghcr.io/abjelosevic88/pocket-homelab-watch:latest
@@ -10,13 +19,15 @@ services:
       TZ: ${TZ:-Europe/Berlin}
       BASE_URL: ${BASE_URL:-http://localhost:8080}
       # SECURE_COOKIES: "true"          # behind HTTPS
-      # Your Jellyfin. Everyone signs in with their own account on it (Settings → Jellyfin).
+      # The Jellyfin below (or yours, see the top of this file).
       JELLYFIN_URL: ${JELLYFIN_URL:-http://jellyfin:8096}
+      JELLYFIN_BUNDLED: ${JELLYFIN_BUNDLED:-true}
+      # What a browser opens for "Open in Jellyfin", if you publish its port:
       JELLYFIN_PUBLIC_URL: ${JELLYFIN_PUBLIC_URL:-}
       # First admin (only used while the database has no users):
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      # The admin's own Jellyfin account, copied once into their connection:
+      # Your own Jellyfin only: the admin's account there, copied once into their connection:
       # an API key + the account it acts as, or a username + password.
       JELLYFIN_API_KEY: ${JELLYFIN_API_KEY:-}
       JELLYFIN_USER: ${JELLYFIN_USER:-}
@@ -37,3 +48,28 @@ services:
       - ./data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      - jellyfin
+
+  # Jellyfin, the official image. Put films in MOVIES_DIR and shows in SHOWS_DIR
+  # (default: media/movies and media/shows next to this file); Jellyfin notices
+  # new files by itself.
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: pocket-watch-jellyfin
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      # Jellyfin's database and artwork, and its transcoding scratch space
+      - ${JELLYFIN_CONFIG_DIR:-./jellyfin/config}:/config
+      - ${JELLYFIN_CACHE_DIR:-./jellyfin/cache}:/cache
+      - ${MOVIES_DIR:-./media/movies}:/media/movies
+      - ${SHOWS_DIR:-./media/shows}:/media/shows
+    # Jellyfin's own apps on a TV or phone, and its dashboard (sign in as
+    # "pocket-watch"; the password is under Settings → Jellyfin as an admin):
+    # ports:
+    #   - "8096:8096"
+    # Hardware transcoding on an Intel/AMD GPU:
+    # devices:
+    #   - /dev/dri:/dev/dri

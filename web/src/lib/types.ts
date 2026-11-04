@@ -62,7 +62,8 @@ export interface PlayInfo {
 }
 
 export interface Connection {
-  mode: 'core' | 'direct' | 'off'; connected: boolean; message?: string; via?: 'direct' | 'key' | 'core'; api_key?: boolean; account?: string; admin?: boolean
+  mode: 'core' | 'direct' | 'bundled' | 'off'; connected: boolean; message?: string; via?: 'direct' | 'key' | 'core' | 'bundled'; api_key?: boolean; account?: string; admin?: boolean
+  bundled: boolean; bundled_admin?: { user: string; password: string }
   server_name?: string; server_version?: string; public_url?: string; username?: string; custom_url?: string; server_url: boolean; quick_connect?: boolean
   core: boolean; core_configured: boolean; counts?: { MovieCount: number; SeriesCount: number; EpisodeCount: number }; sync: SyncState; syncing: boolean
 }

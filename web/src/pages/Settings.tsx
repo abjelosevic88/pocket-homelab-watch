@@ -127,7 +127,8 @@ function JellyfinAccount() {
   const { toast } = useToast()
   const { settings } = useApp()
   const [c, setC] = useState<Connection | null>(null)
-  const [mode, setMode] = useState<'core' | 'direct' | 'off'>('direct')
+  const [mode, setMode] = useState<Connection['mode']>('direct')
+  const [showPw, setShowPw] = useState(false)
   const [how, setHow] = useState<'password' | 'quick'>('password')
   const [form, setForm] = useState({ url: '', username: '', password: '' })
   const [busy, setBusy] = useState(false)
@@ -162,13 +163,20 @@ function JellyfinAccount() {
         <div className="conn-block">
           <div className="conn-mode">
             <Segmented size="sm" value={mode} onChange={m => { setMode(m); if (m !== 'direct') save(m) }} options={[
+              ...(c.bundled ? [{ value: 'bundled' as const, label: 'Included', title: 'Your own account on the Jellyfin that comes with Pocket Watch' }] : []),
               { value: 'core', label: 'Pocket Core', title: c.core ? 'The Jellyfin login Pocket Core holds for you' : 'Needs Pocket Core', disabled: !c.core_configured },
-              { value: 'direct', label: 'My account' }, { value: 'off', label: 'Off' }]} />
+              { value: 'direct', label: c.bundled ? 'Another Jellyfin' : 'My account' }, { value: 'off', label: 'Off' }]} />
           </div>
-          {!c.core_configured && <CoreHint />}
+          {!c.core_configured && !c.bundled && <CoreHint />}
           <div className={`conn-status ${mode === 'off' ? '' : c.connected ? 'ok' : 'bad'}`}><span className="dot" />
-            {c.connected ? <>Signed in as <b>{c.account}</b>{c.admin ? ' (administrator)' : ''} on {c.server_name || 'Jellyfin'} {c.server_version}{c.via === 'core' ? ' — the login Pocket Core keeps for you (Pocket Core → Settings → My logins)' : c.via === 'key' ? ' — with the API key this box was set up with' : ''}.</> : c.message}
+            {c.connected ? <>Signed in as <b>{c.account}</b>{c.admin ? ' (administrator)' : ''} on {c.server_name || 'Jellyfin'} {c.server_version}{c.via === 'core' ? ' — the login Pocket Core keeps for you (Pocket Core → Settings → My logins)' : c.via === 'key' ? ' — with the API key this box was set up with' : c.via === 'bundled' ? ' — the Jellyfin that comes with Pocket Watch, with an account of your own' : ''}.</> : c.message}
           </div>
+          {mode === 'bundled' && c.bundled_admin && (
+            <div className="stack">
+              <p className="muted small">Films go in <code>media/movies</code> and shows in <code>media/shows</code>, next to Pocket Watch's <code>docker-compose.yml</code> (or the folders set as <code>MOVIES_DIR</code> and <code>SHOWS_DIR</code>). New files show up within minutes.</p>
+              <p className="muted small">Jellyfin's own dashboard (publish its port in the compose file first): user <code>{c.bundled_admin.user}</code>, password {showPw ? <code>{c.bundled_admin.password}</code> : <button type="button" className="link-btn" onClick={() => setShowPw(true)}>show</button>}</p>
+            </div>
+          )}
           {c.connected && c.counts && <div className="set-stats">
             <div className="set-stat"><Icon name="film" size={16} /><span className="set-stat-n">{c.counts.MovieCount.toLocaleString()}</span><span className="set-stat-l">Films</span></div>
             <div className="set-stat"><Icon name="tv" size={16} /><span className="set-stat-n">{c.counts.SeriesCount.toLocaleString()}</span><span className="set-stat-l">Shows</span></div>

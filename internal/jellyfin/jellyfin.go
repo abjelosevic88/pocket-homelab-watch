@@ -147,6 +147,8 @@ type PublicInfo struct {
 	ServerName string `json:"ServerName"`
 	Version    string `json:"Version"`
 	ID         string `json:"Id"`
+	// false until someone finishes the setup wizard
+	StartupWizardCompleted bool `json:"StartupWizardCompleted"`
 }
 
 // Public reads the server's name and version (no sign-in needed).
@@ -241,6 +243,82 @@ func (c *Client) Me(ctx context.Context) (*User, error) {
 func (c *Client) Users(ctx context.Context) ([]User, error) {
 	var out []User
 	return out, c.do(ctx, http.MethodGet, "/Users", nil, nil, &out)
+}
+
+// ---- setting up a new server (the Jellyfin that comes with Pocket Watch) ----
+
+// Startup does what a person does in the setup wizard of a fresh server: the
+// language, the first account (an administrator), remote access, done.
+func (c *Client) Startup(ctx context.Context, name, password string) error {
+	steps := []struct {
+		method, path string
+		body         any
+	}{
+		{http.MethodPost, "/Startup/Configuration", map[string]string{"ServerName": "Pocket Watch", "UICulture": "en-US", "MetadataCountryCode": "US", "PreferredMetadataLanguage": "en"}},
+		{http.MethodGet, "/Startup/User", nil}, // creates the first account
+		{http.MethodPost, "/Startup/User", map[string]string{"Name": name, "Password": password}},
+		// other containers and phones are "remote" to Jellyfin
+		{http.MethodPost, "/Startup/RemoteAccess", map[string]bool{"EnableRemoteAccess": true, "EnableAutomaticPortMapping": false}},
+		{http.MethodPost, "/Startup/Complete", nil},
+	}
+	for _, st := range steps {
+		if err := c.do(ctx, st.method, st.path, nil, st.body, nil); err != nil {
+			return fmt.Errorf("%s: %w", st.path, err)
+		}
+	}
+	return nil
+}
+
+// CreateAPIKey makes an API key named app (an administrator only) and returns it.
+func (c *Client) CreateAPIKey(ctx context.Context, app string) (string, error) {
+	if err := c.do(ctx, http.MethodPost, "/Auth/Keys", url.Values{"app": {app}}, nil, nil); err != nil {
+		return "", err
+	}
+	var out struct {
+		Items []struct {
+			AccessToken string `json:"AccessToken"`
+			AppName     string `json:"AppName"`
+			DateCreated string `json:"DateCreated"`
+		} `json:"Items"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/Auth/Keys", nil, nil, &out); err != nil {
+		return "", err
+	}
+	key, newest := "", ""
+	for _, k := range out.Items {
+		if k.AppName == app && k.DateCreated >= newest {
+			key, newest = k.AccessToken, k.DateCreated
+		}
+	}
+	if key == "" {
+		return "", errors.New("Jellyfin made no API key")
+	}
+	return key, nil
+}
+
+// CreateUser adds an account (an administrator or API key only).
+func (c *Client) CreateUser(ctx context.Context, name, password string) (*User, error) {
+	var u User
+	return &u, c.do(ctx, http.MethodPost, "/Users/New", nil, map[string]string{"Name": name, "Password": password}, &u)
+}
+
+// VirtualFolder is one library.
+type VirtualFolder struct {
+	Name           string   `json:"Name"`
+	CollectionType string   `json:"CollectionType"`
+	Locations      []string `json:"Locations"`
+}
+
+// VirtualFolders lists the libraries.
+func (c *Client) VirtualFolders(ctx context.Context) ([]VirtualFolder, error) {
+	var out []VirtualFolder
+	return out, c.do(ctx, http.MethodGet, "/Library/VirtualFolders", nil, nil, &out)
+}
+
+// AddVirtualFolder adds a library over one folder (as Jellyfin sees it) and scans it.
+func (c *Client) AddVirtualFolder(ctx context.Context, name, collectionType, path string) error {
+	q := url.Values{"name": {name}, "collectionType": {collectionType}, "paths": {path}, "refreshLibrary": {"true"}}
+	return c.do(ctx, http.MethodPost, "/Library/VirtualFolders", q, map[string]any{"LibraryOptions": map[string]any{"EnableRealtimeMonitor": true}}, nil)
 }
 
 // ---- items ----

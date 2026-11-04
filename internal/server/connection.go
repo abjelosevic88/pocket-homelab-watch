@@ -27,13 +27,15 @@ import (
 //     JELLYFIN_API_KEY + JELLYFIN_USER).
 //   - core: the Jellyfin login Pocket Core holds for them (Core → My logins:
 //     a token, or an API key with their user id). Nothing is stored here.
+//   - bundled: their own account on the Jellyfin that came with Pocket Watch,
+//     made for them the first time (bundled.go). The default there.
 //
 // With none of these the library stays empty and Settings → Jellyfin says why.
 
 // jfConn is how one request reaches the person's Jellyfin.
 type jfConn struct {
 	c      *jellyfin.Client
-	via    string // direct | key | core
+	via    string // direct | key | core | bundled
 	public string // what a browser opens ("Open in Jellyfin")
 	key    string // server URL + Jellyfin user: the history belongs to exactly this
 	user   string // the Jellyfin account's name
@@ -101,6 +103,12 @@ func (s *Server) jfFor(ctx context.Context, u *store.User) (*jfConn, error) {
 	}
 	if c != nil && c.Kind == "off" {
 		return nil, &errNoJellyfin{"Jellyfin is switched off in Settings → Jellyfin"}
+	}
+	if c != nil && c.Kind == "bundled" || c == nil && s.cfg.JellyfinBundled {
+		if !s.cfg.JellyfinBundled {
+			return nil, &errNoJellyfin{"Pocket Watch no longer comes with its own Jellyfin here: sign in to Jellyfin in Settings → Jellyfin"}
+		}
+		return s.jfBundled(ctx, u)
 	}
 	if c != nil && (c.Kind == "direct" || c.Kind == "key") {
 		base := s.serverBase(c)
@@ -216,8 +224,18 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 		"core_configured": s.core.Configured(),
 		"sync":            s.store.GetSync(ctx, u.ID),
 		"syncing":         s.isSyncing(u.ID),
+		"bundled":         s.cfg.JellyfinBundled,
+	}
+	if s.cfg.JellyfinBundled && u.Role == "admin" {
+		// for Jellyfin's own dashboard, where its port is published
+		if pw := s.openKV(ctx, kvBundledAdmin); pw != "" {
+			out["bundled_admin"] = map[string]string{"user": bundledAdmin, "password": pw}
+		}
 	}
 	mode := "core"
+	if s.cfg.JellyfinBundled {
+		mode = "bundled"
+	}
 	if c != nil {
 		mode = c.Kind
 		if mode == "key" {
@@ -225,7 +243,7 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 		}
 		out["username"] = c.Username
 		out["custom_url"] = c.ServerURL
-	} else if !s.core.Configured() {
+	} else if !s.core.Configured() && !s.cfg.JellyfinBundled {
 		mode = "direct"
 	}
 	out["mode"] = mode
@@ -275,7 +293,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	u := userFrom(ctx)
 	var in struct {
-		Mode     string `json:"mode"` // direct | core | off
+		Mode     string `json:"mode"` // direct | core | bundled | off
 		URL      string `json:"url"`
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -286,9 +304,13 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 	}
 	old, _ := s.store.GetConnection(ctx, u.ID)
 	switch in.Mode {
-	case "off", "core":
+	case "off", "core", "bundled":
 		if in.Mode == "core" && !s.core.Configured() {
 			writeErr(w, http.StatusBadRequest, "there is no Pocket Core on this box")
+			return
+		}
+		if in.Mode == "bundled" && !s.cfg.JellyfinBundled {
+			writeErr(w, http.StatusBadRequest, "Pocket Watch did not come with its own Jellyfin here")
 			return
 		}
 		s.signOutOld(ctx, old)
@@ -319,7 +341,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	default:
-		writeErr(w, http.StatusBadRequest, "mode is direct, core or off")
+		writeErr(w, http.StatusBadRequest, "mode is direct, core, bundled or off")
 		return
 	}
 	s.historySoon(u.ID)

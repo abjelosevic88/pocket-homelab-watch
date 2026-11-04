@@ -52,6 +52,9 @@ needs — what everyone actually watched (on every device), what they want to wa
 arrived, what's coming next week, and help deciding on a Friday evening. Keep using Infuse or the TV app alongside:
 resume points and watched marks are shared. More in [docs/design.md](docs/design.md).
 
+No Jellyfin yet? The sample [docker-compose.yml](docker-compose.yml) brings one along and Pocket Watch sets it up
+itself: the setup wizard, Films and Shows libraries over two folders, and an account for everyone who signs in.
+
 ## What it does
 
 **Watching**
@@ -91,6 +94,20 @@ resume points and watched marks are shared. More in [docs/design.md](docs/design
 - Strictly per person: history, watchlist, requests and settings are yours; admins don’t see anyone else’s watching.
 
 ## Run it
+
+With its own Jellyfin: download [docker-compose.yml](docker-compose.yml), then
+
+```sh
+mkdir -p media/movies media/shows    # or point MOVIES_DIR and SHOWS_DIR at your folders
+docker compose up -d
+```
+
+Open it and create the first account; Jellyfin is ready a minute later. Films go in `media/movies`, shows in
+`media/shows` (`Show Name/Season 01/…`), and appear within minutes. Jellyfin has no port of its own; publish
+`8096` in the compose file for Jellyfin's TV apps and dashboard (user `pocket-watch`, the password is under Settings
+→ Jellyfin for admins). With Pocket Core, Core → Apps → Install app does all of this.
+
+With a Jellyfin you already run:
 
 ```sh
 docker run -d --name pocket-watch -p 8080:8080 -v ./data:/data \

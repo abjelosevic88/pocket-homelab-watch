@@ -40,6 +40,9 @@ Core holds their login (service type `jellyfin`: a token, or an API key plus `US
 |---|---|---|
 | `JELLYFIN_URL` | – | Jellyfin's address as this container reaches it (`http://jellyfin:8096`). Without it, each person types an address under Settings → Jellyfin. |
 | `JELLYFIN_PUBLIC_URL` | – | What a browser opens for "Open in Jellyfin" |
+| `JELLYFIN_BUNDLED` | `false` (`true` in the sample compose file) | The Jellyfin at `JELLYFIN_URL` came with Pocket Watch: on a fresh server the app runs the setup wizard (administrator `pocket-watch`, password sealed in `data/`), makes itself an API key and adds Films (`/media/movies`) and Shows (`/media/shows`) libraries; everyone gets their own Jellyfin account on first use. A Jellyfin already set up by hand is left alone. |
+| `MOVIES_DIR`, `SHOWS_DIR` | `./media/movies`, `./media/shows` | Compose file only: the host folders the bundled Jellyfin reads |
+| `JELLYFIN_CONFIG_DIR`, `JELLYFIN_CACHE_DIR` | `./jellyfin/config`, `./jellyfin/cache` | Compose file only: the bundled Jellyfin's database/artwork and transcoding scratch space |
 | `JELLYFIN_API_KEY` + `JELLYFIN_USER` | – | The owner's account, copied once into their connection: an API key (Dashboard → API Keys) and the Jellyfin user (name or id) it acts as. Resume points and watched marks are written for that user. |
 | `JELLYFIN_USER` + `JELLYFIN_PASSWORD` | – | Or the owner's user name and password (signed in once; only the token is kept) |
 | `SYNC_EVERY` | `10m` | How often each person's history is read from Jellyfin (plays in other Jellyfin apps) |
