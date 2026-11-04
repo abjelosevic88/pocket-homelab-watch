@@ -50,7 +50,8 @@ type Config struct {
 	JellyfinPublicURL string // what a browser opens ("Open in Jellyfin")
 	// The Jellyfin at JELLYFIN_URL came with Pocket Watch (the sample compose
 	// file): the app sets it up and gives everyone their own account on it.
-	JellyfinBundled bool
+	// "true", "auto" (only a fresh Jellyfin, or one this app set up before) or "" (never).
+	JellyfinBundled string
 	// The owner's account, copied once into the owner's own connection: an API
 	// key plus the Jellyfin user (name or id) it acts as, or a password.
 	JellyfinAPIKey   string
@@ -175,7 +176,7 @@ func Load() (*Config, error) {
 
 		JellyfinURL:       strings.TrimRight(env("JELLYFIN_URL", ""), "/"),
 		JellyfinPublicURL: strings.TrimRight(env("JELLYFIN_PUBLIC_URL", ""), "/"),
-		JellyfinBundled:   envBool("JELLYFIN_BUNDLED", false),
+		JellyfinBundled:   bundledMode(env("JELLYFIN_BUNDLED", "")),
 		JellyfinAPIKey:    env("JELLYFIN_API_KEY", ""),
 		JellyfinUser:      env("JELLYFIN_USER", ""),
 		JellyfinPassword:  env("JELLYFIN_PASSWORD", ""),
@@ -221,13 +222,23 @@ func Load() (*Config, error) {
 	if c.OIDCIssuer != "" && (c.OIDCClientID == "" || c.BaseURL == "") {
 		return nil, fmt.Errorf("OIDC_ISSUER needs OIDC_CLIENT_ID and BASE_URL (the callback is BASE_URL/api/v1/auth/oidc/callback)")
 	}
-	if c.JellyfinBundled && c.JellyfinURL == "" {
+	if c.JellyfinBundled != "" && c.JellyfinURL == "" {
 		return nil, fmt.Errorf("JELLYFIN_BUNDLED needs JELLYFIN_URL (the bundled Jellyfin's address, e.g. http://jellyfin:8096)")
 	}
 	if c.SyncEvery < time.Minute {
 		c.SyncEvery = time.Minute
 	}
 	return c, nil
+}
+
+func bundledMode(v string) string {
+	switch strings.ToLower(v) {
+	case "1", "true", "yes", "on":
+		return "true"
+	case "auto":
+		return "auto"
+	}
+	return ""
 }
 
 // Addr returns host:port.

@@ -113,7 +113,10 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	}
 	_ = s.store.PurgeSessions(ctx)
 	go s.janitor(ctx)
-	if s.cfg.JellyfinBundled {
+	if s.cfg.JellyfinBundled != "" {
+		if s.openKV(ctx, kvBundledAdmin) != "" {
+			s.bundled.on.Store(true) // set up by this app before
+		}
 		go s.bundledLoop(ctx)
 	}
 	if s.core.Configured() {

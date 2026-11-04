@@ -104,8 +104,8 @@ func (s *Server) jfFor(ctx context.Context, u *store.User) (*jfConn, error) {
 	if c != nil && c.Kind == "off" {
 		return nil, &errNoJellyfin{"Jellyfin is switched off in Settings → Jellyfin"}
 	}
-	if c != nil && c.Kind == "bundled" || c == nil && s.cfg.JellyfinBundled {
-		if !s.cfg.JellyfinBundled {
+	if c != nil && c.Kind == "bundled" || c == nil && s.bundledOn() {
+		if !s.bundledOn() {
 			return nil, &errNoJellyfin{"Pocket Watch no longer comes with its own Jellyfin here: sign in to Jellyfin in Settings → Jellyfin"}
 		}
 		return s.jfBundled(ctx, u)
@@ -224,16 +224,16 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 		"core_configured": s.core.Configured(),
 		"sync":            s.store.GetSync(ctx, u.ID),
 		"syncing":         s.isSyncing(u.ID),
-		"bundled":         s.cfg.JellyfinBundled,
+		"bundled":         s.bundledOn(),
 	}
-	if s.cfg.JellyfinBundled && u.Role == "admin" {
+	if s.bundledOn() && u.Role == "admin" {
 		// for Jellyfin's own dashboard, where its port is published
 		if pw := s.openKV(ctx, kvBundledAdmin); pw != "" {
 			out["bundled_admin"] = map[string]string{"user": bundledAdmin, "password": pw}
 		}
 	}
 	mode := "core"
-	if s.cfg.JellyfinBundled {
+	if s.bundledOn() {
 		mode = "bundled"
 	}
 	if c != nil {
@@ -243,7 +243,7 @@ func (s *Server) handleConnection(w http.ResponseWriter, r *http.Request) {
 		}
 		out["username"] = c.Username
 		out["custom_url"] = c.ServerURL
-	} else if !s.core.Configured() && !s.cfg.JellyfinBundled {
+	} else if !s.core.Configured() && !s.bundledOn() {
 		mode = "direct"
 	}
 	out["mode"] = mode
@@ -309,7 +309,7 @@ func (s *Server) handleConnect(w http.ResponseWriter, r *http.Request) {
 			writeErr(w, http.StatusBadRequest, "there is no Pocket Core on this box")
 			return
 		}
-		if in.Mode == "bundled" && !s.cfg.JellyfinBundled {
+		if in.Mode == "bundled" && !s.bundledOn() {
 			writeErr(w, http.StatusBadRequest, "Pocket Watch did not come with its own Jellyfin here")
 			return
 		}

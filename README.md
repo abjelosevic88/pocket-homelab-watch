@@ -52,8 +52,9 @@ needs — what everyone actually watched (on every device), what they want to wa
 arrived, what's coming next week, and help deciding on a Friday evening. Keep using Infuse or the TV app alongside:
 resume points and watched marks are shared. More in [docs/design.md](docs/design.md).
 
-No Jellyfin yet? The sample [docker-compose.yml](docker-compose.yml) brings one along and Pocket Watch sets it up
+No Jellyfin yet? The sample [docker-compose.yml](docker-compose.yml) can bring one along and Pocket Watch sets it up
 itself: the setup wizard, Films and Shows libraries over two folders, and an account for everyone who signs in.
+Already run Jellyfin? The same file points Pocket Watch at yours instead, and never changes it.
 
 ## What it does
 
@@ -99,15 +100,23 @@ With its own Jellyfin: download [docker-compose.yml](docker-compose.yml), then
 
 ```sh
 mkdir -p media/movies media/shows    # or point MOVIES_DIR and SHOWS_DIR at your folders
-docker compose up -d
+COMPOSE_PROFILES=jellyfin docker compose up -d    # or put COMPOSE_PROFILES=jellyfin in .env
 ```
 
 Open it and create the first account; Jellyfin is ready a minute later. Films go in `media/movies`, shows in
 `media/shows` (`Show Name/Season 01/…`), and appear within minutes. Jellyfin has no port of its own; publish
 `8096` in the compose file for Jellyfin's TV apps and dashboard (user `pocket-watch`, the password is under Settings
-→ Jellyfin for admins). With Pocket Core, Core → Apps → Install app does all of this.
+→ Jellyfin for admins). With Pocket Core, Core → Apps → Install app does all of this; to switch to your own
+Jellyfin later, remove `COMPOSE_PROFILES` from its `.env`, set `JELLYFIN_URL`, then `docker compose stop jellyfin`
+and `docker compose up -d`.
 
-With a Jellyfin you already run:
+With a Jellyfin you already run, the same compose file without the profile:
+
+```sh
+JELLYFIN_URL=http://your-jellyfin:8096 docker compose up -d
+```
+
+or on its own:
 
 ```sh
 docker run -d --name pocket-watch -p 8080:8080 -v ./data:/data \

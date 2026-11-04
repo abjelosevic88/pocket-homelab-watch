@@ -247,26 +247,39 @@ func (c *Client) Users(ctx context.Context) ([]User, error) {
 
 // ---- setting up a new server (the Jellyfin that comes with Pocket Watch) ----
 
-// Startup does what a person does in the setup wizard of a fresh server: the
-// language, the first account (an administrator), remote access, done.
-func (c *Client) Startup(ctx context.Context, name, password string) error {
-	steps := []struct {
-		method, path string
-		body         any
-	}{
-		{http.MethodPost, "/Startup/Configuration", map[string]string{"ServerName": "Pocket Watch", "UICulture": "en-US", "MetadataCountryCode": "US", "PreferredMetadataLanguage": "en"}},
-		{http.MethodGet, "/Startup/User", nil}, // creates the first account
-		{http.MethodPost, "/Startup/User", map[string]string{"Name": name, "Password": password}},
-		// other containers and phones are "remote" to Jellyfin
-		{http.MethodPost, "/Startup/RemoteAccess", map[string]bool{"EnableRemoteAccess": true, "EnableAutomaticPortMapping": false}},
-		{http.MethodPost, "/Startup/Complete", nil},
-	}
+type step struct {
+	method, path string
+	body         any
+}
+
+func (c *Client) steps(ctx context.Context, steps []step) error {
 	for _, st := range steps {
 		if err := c.do(ctx, st.method, st.path, nil, st.body, nil); err != nil {
 			return fmt.Errorf("%s: %w", st.path, err)
 		}
 	}
 	return nil
+}
+
+// StartupBegin is the setup wizard's first page: the language, and the first
+// account made. Jellyfin refuses it once the wizard is done, so it also proves
+// the server is a fresh one.
+func (c *Client) StartupBegin(ctx context.Context) error {
+	return c.steps(ctx, []step{
+		{http.MethodPost, "/Startup/Configuration", map[string]string{"ServerName": "Pocket Watch", "UICulture": "en-US", "MetadataCountryCode": "US", "PreferredMetadataLanguage": "en"}},
+		{http.MethodGet, "/Startup/User", nil},
+	})
+}
+
+// StartupFinish names the first account (an administrator), allows remote
+// access and closes the wizard.
+func (c *Client) StartupFinish(ctx context.Context, name, password string) error {
+	return c.steps(ctx, []step{
+		{http.MethodPost, "/Startup/User", map[string]string{"Name": name, "Password": password}},
+		// other containers and phones are "remote" to Jellyfin
+		{http.MethodPost, "/Startup/RemoteAccess", map[string]bool{"EnableRemoteAccess": true, "EnableAutomaticPortMapping": false}},
+		{http.MethodPost, "/Startup/Complete", nil},
+	})
 }
 
 // CreateAPIKey makes an API key named app (an administrator only) and returns it.

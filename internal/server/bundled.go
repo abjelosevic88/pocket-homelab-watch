@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/jellyfin"
@@ -15,8 +16,9 @@ import (
 
 // ---- The Jellyfin that comes with Pocket Watch (JELLYFIN_BUNDLED) ----
 //
-// The sample docker-compose.yml starts Jellyfin next to Pocket Watch, with no
-// port of its own, so installing Pocket Watch is all it takes. On its first
+// The sample docker-compose.yml can start Jellyfin next to Pocket Watch (the
+// "jellyfin" profile, on in the sample .env and in Pocket Core's installer),
+// with no port of its own, so installing Pocket Watch is all it takes. On its first
 // start Pocket Watch does what a person would do in Jellyfin's setup wizard:
 // an administrator ("pocket-watch", a random password sealed with
 // secret.key), an API key for itself, and Films and Shows libraries over the
@@ -24,7 +26,9 @@ import (
 // own Jellyfin account the first time (connection kind "bundled"), so resume
 // points and watched marks stay theirs; Pocket Watch acts for them with its
 // key. A Jellyfin someone already set up by hand is left alone: people sign
-// in to it under Settings → Jellyfin like to any other.
+// in to it under Settings → Jellyfin like to any other. That is how
+// JELLYFIN_BUNDLED=auto (the sample's) tells the two apart, so the same compose
+// file runs with the bundled Jellyfin or pointed at your own.
 
 const (
 	bundledAdmin   = "pocket-watch"
@@ -41,10 +45,16 @@ var bundledLibraries = []struct{ name, kind, path string }{
 }
 
 type bundledState struct {
+	on    atomic.Bool // this app sets up and runs JELLYFIN_URL's accounts
 	mu    sync.Mutex
 	key   string // API key once the server is set up
 	state string // why it isn't, for Settings
 	users sync.Mutex
+}
+
+// bundledOn: everyone gets an account on the Jellyfin that came with Pocket Watch.
+func (s *Server) bundledOn() bool {
+	return s.cfg.JellyfinBundled == "true" || s.bundled.on.Load()
 }
 
 func (s *Server) setBundled(key, state string) {
@@ -62,6 +72,9 @@ func (s *Server) bundledKey() (string, string) {
 // errBundledByHand stops the setup for good.
 var errBundledByHand = errors.New("this Jellyfin was set up by hand, not by Pocket Watch: sign in to it under Settings → Jellyfin, or set JELLYFIN_API_KEY")
 
+// errNotBundled: auto, and JELLYFIN_URL is someone's own Jellyfin.
+var errNotBundled = errors.New("not bundled")
+
 // bundledLoop sets the server up, waiting for it to start first.
 func (s *Server) bundledLoop(ctx context.Context) {
 	s.setBundled("", "the Jellyfin that comes with Pocket Watch is starting")
@@ -71,13 +84,18 @@ func (s *Server) bundledLoop(ctx context.Context) {
 		if err == nil {
 			return
 		}
+		if errors.Is(err, errNotBundled) {
+			s.setBundled("", "")
+			s.log.Info("jellyfin was set up before; people sign in to it under Settings → Jellyfin", "url", s.cfg.JellyfinURL)
+			return
+		}
 		if errors.Is(err, errBundledByHand) {
 			s.setBundled("", err.Error())
 			s.log.Warn("bundled jellyfin", "err", err)
 			return
 		}
 		s.setBundled("", "the Jellyfin that comes with Pocket Watch is not ready: "+err.Error())
-		if wait >= 30*time.Second {
+		if wait >= 30*time.Second && s.bundledOn() {
 			s.log.Warn("bundled jellyfin not ready", "err", err)
 		}
 		select {
@@ -98,20 +116,29 @@ func (s *Server) setupBundled(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if pub.StartupWizardCompleted && s.cfg.JellyfinBundled == "auto" && s.openKV(ctx, kvBundledAdmin) == "" {
+		return errNotBundled
+	}
 	key := s.cfg.JellyfinAPIKey
 	if key == "" {
 		key = s.openKV(ctx, kvBundledKey)
 	}
 	if !pub.StartupWizardCompleted {
+		// A starting Jellyfin can say "not set up" before it has read its
+		// settings: only a wizard that lets us in proves it is fresh.
+		if err := jc.StartupBegin(ctx); err != nil {
+			return err
+		}
+		s.bundled.on.Store(true)
 		pw := s.openKV(ctx, kvBundledAdmin)
 		if pw == "" {
-			// kept before the wizard runs, so a restart halfway signs in with the same one
+			// kept before the password is set, so a restart halfway signs in with the same one
 			pw = store.RandomToken(24)
 			if err := s.sealKV(ctx, kvBundledAdmin, pw); err != nil {
 				return err
 			}
 		}
-		if err := jc.Startup(ctx, bundledAdmin, pw); err != nil {
+		if err := jc.StartupFinish(ctx, bundledAdmin, pw); err != nil {
 			return err
 		}
 		s.log.Info("bundled jellyfin set up", "admin", bundledAdmin)
