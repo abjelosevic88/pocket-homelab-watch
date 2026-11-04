@@ -9,7 +9,10 @@ Everything Pocket Watch keeps is in `DATA_DIR` (`/data` in the container):
 | `core.token`, `core.token.oidc.json` | The app's Pocket Core registration (re-created by registering again) |
 | `backups/` | Snapshots made by `pocket-watch backup` or Settings → Backup & data |
 
-Your films, shows, resume points, watched marks and favourites live in Jellyfin — back that up there. History
+Your films, shows, resume points, watched marks and favourites live in Jellyfin — back that up there. With the
+Jellyfin that comes with Pocket Watch, that is `jellyfin/config` next to the compose file (its database, artwork and
+the accounts Pocket Watch made; `jellyfin/cache` can be skipped) plus your media folders. Pocket Watch's own data
+(`data/`) holds the Jellyfin administrator's password and API key, sealed with `secret.key`: keep the two together. History
 before Pocket Watch was installed can always be read again from Jellyfin (Settings → Jellyfin → Read everything
 again), but only as one entry per finished title.
 

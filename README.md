@@ -1,6 +1,6 @@
 <p align="center"><img src="web/public/favicon.svg" width="72" alt=""></p>
 <h1 align="center">Pocket Watch</h1>
-<p align="center">Films and shows for the whole household, on top of Jellyfin: a fast player, continue watching and next up, a watch history it keeps from every Jellyfin app with stats, a watchlist, Jellyseerr requests that tell you when they arrive, upcoming episodes, and “what should we watch?” from a sentence.<br>One Go binary, one SQLite file, one volume.</p>
+<p align="center">Films and shows for the whole household, on top of Jellyfin: a fast player, continue watching and next up, a watch history it keeps from every Jellyfin app with stats, a watchlist, Jellyseerr requests that tell you when they arrive, upcoming episodes, and “what should we watch?” from a sentence.<br>Comes with its own Jellyfin, set up for you — or works with yours.</p>
 <p align="center">
   <a href="https://github.com/abjelosevic88/pocket-homelab-watch/actions"><img src="https://github.com/abjelosevic88/pocket-homelab-watch/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
   <a href="https://github.com/abjelosevic88/pocket-homelab-watch/pkgs/container/pocket-homelab-watch"><img src="https://img.shields.io/badge/ghcr.io-amd64%20%7C%20arm64%20%7C%20armv7-blue" alt="image"></a>
@@ -52,9 +52,21 @@ needs — what everyone actually watched (on every device), what they want to wa
 arrived, what's coming next week, and help deciding on a Friday evening. Keep using Infuse or the TV app alongside:
 resume points and watched marks are shared. More in [docs/design.md](docs/design.md).
 
-No Jellyfin yet? The sample [docker-compose.yml](docker-compose.yml) can bring one along and Pocket Watch sets it up
-itself: the setup wizard, Films and Shows libraries over two folders, and an account for everyone who signs in.
-Already run Jellyfin? The same file points Pocket Watch at yours instead, and never changes it.
+## Jellyfin included, or bring your own
+
+**No Jellyfin yet?** Pocket Watch can bring its own, and you never have to open it:
+
+- It runs next to Pocket Watch with no port of its own. Only the app talks to it.
+- On the first start Pocket Watch does Jellyfin's setup wizard for you: an administrator, an API key, and Films and
+  Shows libraries over two folders.
+- Everyone who signs in to Pocket Watch gets their own Jellyfin account automatically, so resume points and watched
+  marks stay theirs.
+- New files are picked up every 15 minutes, or right away with *Scan for new files*.
+
+**Already run Jellyfin?** Point Pocket Watch at it instead. It never changes a Jellyfin that is already set up;
+everyone signs in with their own account there.
+
+The same [docker-compose.yml](docker-compose.yml) does both: the bundled Jellyfin is its `jellyfin` profile.
 
 ## What it does
 
@@ -96,28 +108,42 @@ Already run Jellyfin? The same file points Pocket Watch at yours instead, and ne
 
 ## Run it
 
-With its own Jellyfin: download [docker-compose.yml](docker-compose.yml), then
+Pick one of three ways. Whichever you choose, open Pocket Watch afterwards and create the first account. See
+[docs/configuration.md](docs/configuration.md) for every option, [docs/api.md](docs/api.md) for the API (and a
+Homepage widget), [docs/reverse-proxy.md](docs/reverse-proxy.md) and [docs/backup.md](docs/backup.md).
+
+### With Pocket Core: one click
+
+In [Pocket Core](https://github.com/abjelosevic88/pocket-homelab-core), go to **Apps → Install app → Pocket Watch**.
+It installs Pocket Watch with its own Jellyfin, creates `media/movies` and `media/shows` in the app's folder, and
+signs everyone in with Pocket Core. Copy your films and shows in, and that's all.
+
+### With its own Jellyfin (Docker Compose)
+
+Download [docker-compose.yml](docker-compose.yml) and [.env.example](.env.example) (save it as `.env` and set `BASE_URL`), then:
 
 ```sh
-mkdir -p media/movies media/shows    # or point MOVIES_DIR and SHOWS_DIR at your folders
-COMPOSE_PROFILES=jellyfin docker compose up -d    # or put COMPOSE_PROFILES=jellyfin in .env
+mkdir -p media/movies media/shows    # or set MOVIES_DIR and SHOWS_DIR in .env to your folders
+docker compose up -d                 # .env has COMPOSE_PROFILES=jellyfin: the app and Jellyfin start together
 ```
 
-Open it and create the first account; Jellyfin is ready a minute later. Films go in `media/movies`, shows in
-`media/shows` (`Show Name/Season 01/…`); Jellyfin looks for new files every 15 minutes (or Settings → Jellyfin →
-Scan for new files). Jellyfin has no port of its own; publish
-`8096` in the compose file for Jellyfin's TV apps and dashboard (user `pocket-watch`, the password is under Settings
-→ Jellyfin for admins). With Pocket Core, Core → Apps → Install app does all of this; to switch to your own
-Jellyfin later, remove `COMPOSE_PROFILES` from its `.env`, set `JELLYFIN_URL`, then `docker compose stop jellyfin`
-and `docker compose up -d`.
+- About a minute after the first start, Pocket Watch has set Jellyfin up.
+- Films go in `media/movies` (`Film Name (Year)/…`) and shows in `media/shows` (`Show Name/Season 01/…`).
+- Jellyfin looks for new files every 15 minutes; admins can also use **Settings → Jellyfin → Scan for new files**.
+- Jellyfin has no port of its own. For Jellyfin's TV apps and its dashboard, uncomment `8096` under `ports` in the
+  compose file (and `/dev/dri` under `devices` for hardware transcoding). The dashboard user is `pocket-watch`;
+  admins find the password under Settings → Jellyfin.
 
-With a Jellyfin you already run, the same compose file without the profile:
+### With the Jellyfin you already run
+
+Use the same compose file without the profile: drop `COMPOSE_PROFILES` from `.env` and point Pocket Watch at your
+server.
 
 ```sh
 JELLYFIN_URL=http://your-jellyfin:8096 docker compose up -d
 ```
 
-or on its own:
+Or as a single container:
 
 ```sh
 docker run -d --name pocket-watch -p 8080:8080 -v ./data:/data \
@@ -126,10 +152,15 @@ docker run -d --name pocket-watch -p 8080:8080 -v ./data:/data \
   ghcr.io/abjelosevic88/pocket-homelab-watch:latest
 ```
 
-Open it, create the first account, then sign in to Jellyfin under Settings → Jellyfin (password or Quick Connect).
-An admin adds Jellyseerr, Sonarr and Radarr under Settings → Services. See
-[docs/configuration.md](docs/configuration.md) for every option, [docs/api.md](docs/api.md) for the API (and a
-Homepage widget), [docs/reverse-proxy.md](docs/reverse-proxy.md) and [docs/backup.md](docs/backup.md).
+Everyone signs in with their own Jellyfin account under Settings → Jellyfin (password or Quick Connect, or the
+login Pocket Core keeps for them). Pocket Watch never changes a Jellyfin that is already set up.
+
+Switching an install later: to move from the included Jellyfin to yours, remove `COMPOSE_PROFILES` from `.env`, set
+`JELLYFIN_URL`, then run `docker compose stop jellyfin && docker compose up -d`.
+
+### Box services
+
+An admin adds Jellyseerr, Sonarr, Radarr and Maintainerr under Settings → Services (or they come from Pocket Core).
 
 Try it with a demo library: [scripts/demo-library/make.sh](scripts/demo-library/make.sh) runs a throwaway Jellyfin
 with Blender open movies, silent-era public-domain films and three old or Creative Commons series (generated
@@ -138,6 +169,7 @@ stand-in files, real metadata). The screenshots above are that library (credits 
 
 ## Built with
 
-Go, chi, SQLite (modernc), React 19, Vite, hls.js. Works with Jellyfin 10.9+ (media segments need 10.10); works
+Go, chi, SQLite (modernc), React 19, Vite, hls.js. The bundled Jellyfin is the official `jellyfin/jellyfin` image
+(tested with 10.11 and 12.4). Your own Jellyfin needs 10.9+ (media segments need 10.10). Works
 alone, and with [Pocket Core](https://github.com/abjelosevic88/pocket-homelab-core) for single sign-on, paired phones
 and the links between apps. MIT licensed.
