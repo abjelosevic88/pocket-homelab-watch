@@ -453,7 +453,6 @@ body.player-open pocket-ask-launcher:not([open]) { display: none; }
 .tm-hint { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: rgba(255, 255, 255, .55); }
 .tm-hint kbd { background: rgba(255, 255, 255, .14); color: #fff; border: 0; font-size: 11px; padding: 0 5px; border-radius: 4px; }
 .tm-link { background: none; border: 0; padding: 0; color: #c4b5fd; font: inherit; font-size: 12px; cursor: pointer; text-decoration: none; white-space: nowrap; }
-.tm-link:hover:not(:disabled) { text-decoration: underline; }
 .tm-link:disabled { color: rgba(255, 255, 255, .3); cursor: default; }
 .tm-everyone { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, .06); min-height: 52px; }
 .tm-ev-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
