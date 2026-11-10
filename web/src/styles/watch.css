@@ -472,3 +472,24 @@ body.player-open pocket-ask-launcher:not([open]) { display: none; }
 .svc-line.ok .dot { background: var(--success); box-shadow: 0 0 0 3px var(--success-soft); }
 .svc-line.bad .dot { background: var(--warning); box-shadow: 0 0 0 3px var(--warning-soft); }
 .svc-line code { font-size: 12px; }
+
+/* Leaving soon and clean-up */
+.leaving-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.leaving-why { margin: 0; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.leaving-callout { display: flex; align-items: center; gap: 8px; }
+.cleanup-starters { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.cleanup-starter { display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); cursor: pointer; }
+.cleanup-starter:hover { border-color: var(--accent); }
+.cleanup-cond { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 10px; }
+.cleanup-preview { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--surface-2, var(--accent-soft)); }
+.cleanup-hits { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 12px; max-height: 340px; overflow: auto; }
+.cleanup-hit { display: flex; align-items: center; gap: 8px; min-width: 0; color: inherit; }
+.cleanup-hit img { width: 26px; height: 39px; object-fit: cover; border-radius: 4px; background: var(--hairline); flex: none; }
+.cleanup-log { display: flex; flex-direction: column; }
+.cleanup-log-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-top: 1px solid var(--hairline); }
+.cleanup-log-row:first-child { border-top: 0; }
+.cleanup-log-row .icon { margin-top: 3px; flex: none; }
+.cleanup-cond .sel { width: auto; flex: 0 1 auto; min-width: 130px; }
+.cleanup-cond .sel:first-child { min-width: 210px; }
+.cleanup-cond > .btn:last-child { margin-left: auto; }
+@media (max-width: 767px) { .cleanup-cond .sel, .cleanup-cond .sel:first-child { flex: 1 1 100%; } }

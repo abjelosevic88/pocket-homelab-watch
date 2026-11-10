@@ -10,8 +10,10 @@ import { Icon } from '../components/icons'
 import { Img, NotConnected, PosterCard, Progress, Shelf } from '../components/cards'
 import { useCrumb } from '../components/Layout'
 import { Loading, MenuButton, errMsg, useToast } from '../components/ui'
+import { RemoveDialog } from '../components/Cleanup'
+import { leavesIn } from './Browse'
 
-interface Detail { title: Title; seasons?: Title[]; episodes?: Title[]; next?: Title; similar?: Title[]; titles?: Title[]; watchlist_id?: number }
+interface Detail { title: Title; seasons?: Title[]; episodes?: Title[]; next?: Title; similar?: Title[]; titles?: Title[]; watchlist_id?: number; leaving?: { reason: string; remove_on: string; manual: boolean; size: number }; can_keep?: boolean }
 
 export default function TitlePage({ person }: { person?: boolean }) {
   const { id = '' } = useParams()
@@ -30,7 +32,12 @@ export default function TitlePage({ person }: { person?: boolean }) {
 function TitleView({ d, reload, setD }: { d: Detail; reload: () => void; setD: (d: Detail) => void }) {
   const t = d.title
   const navigate = useNavigate()
-  const { settings } = useApp()
+  const { settings, user } = useApp()
+  const [removing, setRemoving] = useState(false)
+  const admin = user?.role === 'admin'
+  const keep = async () => {
+    try { await api.post(`${V1}/leaving/${t.id}/keep`); toast('Kept: it stays in the library'); reload() } catch (e) { toast(errMsg(e), 'err') }
+  }
   const { toast } = useToast()
   const isShow = t.type === 'series' || t.type === 'season'
   const mark = async (id: string, played: boolean) => {
@@ -72,7 +79,7 @@ function TitleView({ d, reload, setD }: { d: Detail; reload: () => void; setD: (
           </p>
           {t.genres && t.genres.length > 0 && <p className="title-genres">{t.genres.map(g => <Link key={g} to={`${t.type === 'movie' ? '/films' : '/shows'}?genre=${encodeURIComponent(g)}`} className="chip sm">{g}</Link>)}</p>}
           {t.tagline && <p className="tagline">{t.tagline}</p>}
-          {t.leaving && <p className="callout warn small"><Icon name="hourglass" size={14} />Leaving the library on {fmtDate(t.leaving)}.</p>}
+          {t.leaving && <div className="callout warn small leaving-callout"><Icon name="hourglass" size={14} /><span className="grow">Leaving the library on {fmtDate(t.leaving)} ({leavesIn(t.leaving)}){d.leaving?.reason ? <>: {d.leaving.reason.charAt(0).toLowerCase() + d.leaving.reason.slice(1)}</> : null}.</span>{d.can_keep && <button type="button" className="btn sm" onClick={keep}><Icon name="bookmark" size={13} />Keep it</button>}</div>}
           <div className="title-actions">
             {playTarget && <button type="button" className="btn primary lg" onClick={() => navigate(`/play/${playTarget.id}`)}><Icon name="play" size={16} />{playLabel}</button>}
             {(t.playable || isShow) && <button type="button" className={`btn lg round-ish ${t.played ? 'on' : ''}`} title={t.played ? 'Watched — mark as not watched' : 'Mark as watched'} aria-label="Watched" onClick={() => mark(t.id, !t.played)}><Icon name={t.played ? 'check-circle' : 'check'} size={17} /><span className="hide-mobile">{t.played ? 'Watched' : 'Mark watched'}</span></button>}
@@ -83,6 +90,7 @@ function TitleView({ d, reload, setD }: { d: Detail; reload: () => void; setD: (
               ...(jf ? [{ label: 'Open in Jellyfin', icon: 'external', onSelect: () => window.open(`${jf}/web/#/details?id=${t.id}`, '_blank') }] : []),
               ...(t.imdb ? [{ label: 'IMDb', icon: 'external', onSelect: () => window.open(`https://www.imdb.com/title/${t.imdb}/`, '_blank') }] : []),
               ...(t.tmdb ? [{ label: 'TMDB', icon: 'external', onSelect: () => window.open(`https://www.themoviedb.org/${t.type === 'movie' ? 'movie' : 'tv'}/${t.tmdb}`, '_blank') }] : []),
+              ...(admin && (t.type === 'movie' || t.type === 'series' || t.type === 'season') ? ['sep' as const, { label: 'Remove from the library…', icon: 'trash', danger: true, onSelect: () => setRemoving(true) }] : []),
             ]}><Icon name="more" size={17} /></MenuButton>
           </div>
           {t.playable && !t.played && t.progress ? <div className="title-progress"><Progress value={t.progress} /><span className="muted small">{remaining(t)}</span></div> : null}
@@ -115,6 +123,8 @@ function TitleView({ d, reload, setD }: { d: Detail; reload: () => void; setD: (
         </Shelf>
       )}
       {d.similar && d.similar.length > 0 && <Shelf title="More like this">{d.similar.map(s => <PosterCard key={s.id} t={s} />)}</Shelf>}
+      {removing && <RemoveDialog id={t.id} name={t.type === 'season' && t.series_name ? `${t.series_name} · ${t.name}` : t.name} defaultDays={settings?.cleanup_manual_days || 7} onClose={() => setRemoving(false)}
+        onDone={removed => { setRemoving(false); if (removed) navigate(t.type === 'season' && t.series_id ? `/title/${t.series_id}` : t.type === 'movie' ? '/films' : '/shows'); else reload() }} />}
     </div>
   )
 }

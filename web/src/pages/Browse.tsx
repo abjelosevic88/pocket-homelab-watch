@@ -1,13 +1,14 @@
 // Films and Shows: the whole shelf, filtered and sorted, loading more as you scroll.
 import { useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
-import type { Title } from '../lib/types'
+import type { LeavingEntry, Title } from '../lib/types'
 import { V1 } from '../lib/watch'
 import { Icon } from '../components/icons'
 import { NotConnected, PosterCard } from '../components/cards'
 import { Select } from '../components/Select'
-import { Empty, Loading, PageHeader, Segmented, errMsg, useAsync, useDebounce } from '../components/ui'
+import { Empty, Loading, PageHeader, Segmented, errMsg, useAsync, useDebounce, useToast } from '../components/ui'
+import { fmtBytes } from '../lib/format'
 import { ApiError } from '../lib/api'
 
 const SORTS = [
@@ -81,14 +82,45 @@ export default function Browse({ kind }: { kind: 'movie' | 'series' }) {
   )
 }
 
+/** "today", "tomorrow", "in 5 days" */
+export function leavesIn(day: string): string {
+  const [y, m, d] = day.split('-').map(Number)
+  const now = new Date()
+  const n = Math.round((new Date(y, m - 1, d).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000)
+  return n <= 0 ? 'today' : n === 1 ? 'tomorrow' : `in ${n} days`
+}
+
 export function Leaving() {
-  const { data, error } = useAsync(() => api.get<Title[]>(`${V1}/leaving`), [])
+  const { toast } = useToast()
+  const [n, setN] = useState(0)
+  const { data, error } = useAsync(() => api.get<{ items: LeavingEntry[]; can_keep: boolean; admin: boolean }>(`${V1}/leaving`), [n])
   if (error) return <div className="callout danger"><Icon name="alert" size={15} />{error}</div>
   if (!data) return <Loading />
+  const keep = async (e: LeavingEntry) => {
+    try { await api.post(`${V1}/leaving/${e.title.id}/keep`); toast(`Keeping ${e.title.series_name && e.title.type === 'season' ? `${e.title.series_name} · ${e.title.name}` : e.title.name}`); setN(n + 1) } catch (x) { toast(errMsg(x), 'err') }
+  }
+  const cancel = async (e: LeavingEntry) => {
+    try { await api.del(`${V1}/leaving/${e.title.id}`); toast('Taken off Leaving soon'); setN(n + 1) } catch (x) { toast(errMsg(x), 'err') }
+  }
   return (
     <div>
-      <PageHeader title="Leaving soon" sub="Maintainerr will clean these up on the day shown." />
-      {data.length === 0 ? <Empty title="Nothing is leaving" icon="hourglass" /> : <div className="grid-posters">{data.map(t => <PosterCard key={t.id} t={t} sub={`Leaves ${t.leaving}`} />)}</div>}
+      <PageHeader title="Leaving soon" sub={data.can_keep ? 'Clean-up removes these on the day shown. Want to watch one? Keep it and it stays.' : 'Clean-up removes these on the day shown.'}
+        actions={data.admin && <Link to="/settings/cleanup" className="btn sm"><Icon name="settings" size={14} />Clean-up rules</Link>} />
+      {data.items.length === 0 ? <Empty title="Nothing is leaving" icon="hourglass" /> : (
+        <div className="grid-posters">
+          {data.items.map(e => (
+            <div key={e.title.id} className="leaving-card">
+              <PosterCard t={e.title} sub={<>{e.title.type === 'season' && e.title.series_name ? `${e.title.series_name} · ` : ''}Leaves {leavesIn(e.remove_on)}</>} />
+              <p className="leaving-why small muted" title={e.rule ? `Rule: ${e.rule}` : undefined}>{e.reason}{e.size ? ` · ${fmtBytes(e.size)}` : ''}</p>
+              {e.error && <p className="small bad" style={{ margin: 0 }}>{e.error}</p>}
+              <div className="row" style={{ gap: 6 }}>
+                {data.can_keep && <button type="button" className="btn sm" onClick={() => keep(e)}><Icon name="bookmark" size={13} />Keep</button>}
+                {data.admin && e.manual && <button type="button" className="btn ghost sm" onClick={() => cancel(e)}>Cancel</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

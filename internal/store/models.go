@@ -124,6 +124,11 @@ type Settings struct {
 	NotifyFormat    string `json:"notify_format"` // apprise | ntfy | json
 	NotifyAvailable bool   `json:"notify_available"`
 	NotifyWeekly    bool   `json:"notify_weekly"`
+	NotifyLeaving   bool   `json:"notify_leaving"` // something you asked for is leaving; for the owner also what clean-up removed
+
+	// Clean-up (the box): days a title picked by hand stays on Leaving soon, and who may keep titles.
+	CleanupManualDays int    `json:"cleanup_manual_days"`
+	CleanupKeep       string `json:"cleanup_keep"` // anyone | admins
 
 	// "What should we watch?" (Pocket AI through Core, or an OpenAI-compatible API).
 	AIProvider    string `json:"ai_provider"` // auto | pocket | openai
@@ -132,7 +137,7 @@ type Settings struct {
 	OpenAIModel   string `json:"openai_model"`
 	OpenAIBaseURL string `json:"openai_base_url"`
 
-	// The box's services (admins): requests, upcoming, leaving soon, subtitles.
+	// The box's services (admins): requests, upcoming and clean-up, subtitles.
 	SeerrURL       string `json:"seerr_url"`
 	SeerrPublicURL string `json:"seerr_public_url"`
 	SeerrKey       string `json:"seerr_key"`
@@ -140,13 +145,11 @@ type Settings struct {
 	SonarrKey      string `json:"sonarr_key"`
 	RadarrURL      string `json:"radarr_url"`
 	RadarrKey      string `json:"radarr_key"`
-	MaintainerrURL string `json:"maintainerr_url"`
 	SubtitlesURL   string `json:"subtitles_url"` // public: the nudge page link
 	// How each is reached: core | direct | off; "" = automatic (Core first, then the address and key here).
-	SeerrMode       string `json:"seerr_mode"`
-	SonarrMode      string `json:"sonarr_mode"`
-	RadarrMode      string `json:"radarr_mode"`
-	MaintainerrMode string `json:"maintainerr_mode"`
+	SeerrMode  string `json:"seerr_mode"`
+	SonarrMode string `json:"sonarr_mode"`
+	RadarrMode string `json:"radarr_mode"`
 	// Saving subtitle timing into the file: core (a link, as the person) | direct (this token) | off; "" = direct when a token is set, else core.
 	SubtitlesMode   string `json:"subtitles_mode"`
 	SubtitlesAPIURL string `json:"subtitles_api_url"`

@@ -55,7 +55,7 @@ type Title struct {
 	Audio       string   `json:"audio,omitempty"` // 5.1 · EAC3
 	Trailer     string   `json:"trailer,omitempty"`
 	People      []Cast   `json:"people,omitempty"`
-	Leaving     string   `json:"leaving,omitempty"` // Maintainerr: the day it is removed
+	Leaving     string   `json:"leaving,omitempty"` // clean-up: the day it leaves the library
 	PlayableNow bool     `json:"playable"`
 }
 

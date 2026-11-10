@@ -25,7 +25,16 @@ Films, shows, seasons, episodes and people are **titles**: Jellyfin's item, trim
 | `GET /titles/{id}/episodes?season=<seasonId>` | One season's episodes |
 | `POST /titles/{id}/played {"played":true}` | Watched / not watched (a show or season: every episode), in Jellyfin |
 | `POST /titles/{id}/favorite {"favorite":true}` | A favourite in Jellyfin |
-| `GET /leaving` | Titles Maintainerr will remove, with `leaving` (the day) |
+| `GET /leaving` | `items`: titles on Leaving soon with `title`, `reason`, `rule`, `manual`, `size`, `remove_on`; `can_keep`, `admin` |
+| `POST /leaving/{id}/keep` | Keep a title: off Leaving soon, no rule picks it again (anyone, or admins only) |
+| `POST /leaving/{id} {"days":7}` | Admin: put a film, show or season on Leaving soon by hand; `days: 0` removes it now |
+| `DELETE /leaving/{id}` | Admin: take a by-hand title off Leaving soon |
+| `GET /cleanup` | Admin: `rules`, `keeps`, `log`, `last` run, `running`, `settings`, connected `services` |
+| `POST /cleanup/rules`, `PUT/DELETE /cleanup/rules/{id}` | Admin: a rule `{name, target: movie\|series\|season, match: all\|any, conditions: [{field, op, value}], protect, grace_days, action: delete\|unmonitor, exclude_lists, clear_request, active}` |
+| `POST /cleanup/preview` | Admin: what a rule (saved or not) would pick now: `matches`, `protected`, `size`, `people` |
+| `POST /cleanup/run` | Admin: run the rules now (in the background) |
+| `PUT /cleanup/settings {"keep":"anyone","manual_days":7}` | Admin: who may keep; days for by-hand removals |
+| `DELETE /cleanup/keeps/{id}` | Admin: let the rules see a kept title again |
 | `GET /img/{id}/{Primary\|Backdrop\|Thumb\|Logo}?tag=&w=` | An image, resized (cached for a month when `tag` is given) |
 
 ## Playing

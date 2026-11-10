@@ -11,16 +11,18 @@ import { Select } from '../components/Select'
 import { ShortcutsSheet } from '../components/ShortcutsSheet'
 import { PocketModelSelect } from '../components/PocketModelSelect'
 import { AIStatusLine, useAIStatus } from '../components/Tonight'
+import { Cleanup } from '../components/Cleanup'
 
-type TabId = 'jellyfin' | 'playback' | 'history' | 'ai' | 'notifications' | 'services' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
+type TabId = 'jellyfin' | 'playback' | 'history' | 'ai' | 'notifications' | 'services' | 'cleanup' | 'profile' | 'people' | 'tokens' | 'data' | 'about'
 
 const TABS: { id: TabId; label: string; icon: string; sub: string; admin?: boolean }[] = [
   { id: 'jellyfin', label: 'Jellyfin', icon: 'server', sub: 'Your Jellyfin account: Pocket Watch plays with it, so resume points and watched marks stay yours everywhere.' },
   { id: 'playback', label: 'Playback', icon: 'play-circle', sub: 'Quality, audio and subtitle languages, skipping intros, the next episode.' },
   { id: 'history', label: 'History & upcoming', icon: 'history', sub: 'Where your history comes from, and which shows count as yours.' },
   { id: 'ai', label: 'AI', icon: 'sparkles', sub: 'Who answers “What should we watch?”.' },
-  { id: 'notifications', label: 'Notifications', icon: 'bell', sub: 'A push when a request arrives, and a weekly recap.' },
-  { id: 'services', label: 'Services', icon: 'layers', sub: 'Jellyseerr, Sonarr, Radarr, Maintainerr and Pocket Subtitles for the whole box.', admin: true },
+  { id: 'notifications', label: 'Notifications', icon: 'bell', sub: 'A push when a request arrives or is leaving, and a weekly recap.' },
+  { id: 'services', label: 'Services', icon: 'layers', sub: 'Jellyseerr, Sonarr, Radarr and Pocket Subtitles for the whole box.', admin: true },
+  { id: 'cleanup', label: 'Clean-up', icon: 'hourglass', sub: 'Rules that clear watched and forgotten titles out of the library, after a stay on Leaving soon.', admin: true },
   { id: 'profile', label: 'Profile', icon: 'user', sub: 'Your name, email and password.' },
   { id: 'people', label: 'People', icon: 'users', sub: 'Everyone who has an account on this box.' },
   { id: 'tokens', label: 'API & shortcuts', icon: 'key', sub: 'Personal tokens for Homepage widgets, Siri Shortcuts and Raycast.' },
@@ -72,6 +74,7 @@ export default function Settings() {
             {tab === 'ai' && <AISettings />}
             {tab === 'notifications' && <Notifications />}
             {tab === 'services' && <Services />}
+            {tab === 'cleanup' && <Cleanup />}
             {tab === 'profile' && <Profile />}
             {tab === 'people' && <Users />}
             {tab === 'tokens' && <Tokens />}
@@ -326,6 +329,7 @@ function Notifications() {
         <SettingRow title="Format"><Segmented value={f.notify_format} onChange={v => setF({ ...f, notify_format: v })} options={[{ value: 'apprise', label: 'Apprise' }, { value: 'ntfy', label: 'ntfy' }, { value: 'json', label: 'JSON' }]} size="sm" /></SettingRow>
         <SettingRow title="A request arrives" help="When something you asked for in Jellyseerr is ready to watch."><Switch checked={f.notify_available} onChange={v => setF({ ...f, notify_available: v })} label="Push arrivals" /></SettingRow>
         <SettingRow title="Weekly recap" help="Monday morning: how much you watched, films and episodes, your top show."><Switch checked={f.notify_weekly} onChange={v => setF({ ...f, notify_weekly: v })} label="Weekly recap" /></SettingRow>
+        <SettingRow title="Leaving soon" help="When something you asked for goes on Leaving soon, so you can keep it. The box owner also hears what clean-up removed."><Switch checked={f.notify_leaving} onChange={v => setF({ ...f, notify_leaving: v })} label="Push leaving" /></SettingRow>
       </Section>
       <div className="row wrap">
         <button type="button" className="btn primary" onClick={() => save()} disabled={busy}>Save changes</button>
@@ -396,9 +400,8 @@ function Services() {
       <p className="muted small">These belong to the whole box. With Pocket Core, their addresses and keys live in Core (Pocket Core → Services, and your own logins under Settings → My logins), each switched on in Pocket Core → Links — nothing is kept here. Direct is for a box without Core. Pocket Watch still acts as each person: requests go in as their own Jellyseerr user, and nobody sees anyone else's requests or history.</p>
       {svc('seerr', 'Jellyseerr', 'ticket', 'Discover, requests, and a push when they arrive. People without a Jellyseerr user get one imported from Jellyfin on their first request.', 'seerr_mode', 'seerr_url', 'seerr_key', 'http://jellyseerr:5055',
         <Field label="Address people open (optional)" help="For links to Jellyseerr; the address above may only work inside the box."><input value={f.seerr_public_url || ''} onChange={e => setF({ ...f, seerr_public_url: e.target.value })} placeholder="https://requests.example.com" /></Field>)}
-      {svc('sonarr', 'Sonarr', 'tv', 'Upcoming episodes (the calendar only).', 'sonarr_mode', 'sonarr_url', 'sonarr_key', 'http://sonarr:8989')}
-      {svc('radarr', 'Radarr', 'film', 'Upcoming films: cinema, digital and disc releases.', 'radarr_mode', 'radarr_url', 'radarr_key', 'http://radarr:7878')}
-      {svc('maintainerr', 'Maintainerr', 'hourglass', '“Leaving soon”: titles a cleanup rule will remove, with the day.', 'maintainerr_mode', 'maintainerr_url', null, 'http://maintainerr:6246')}
+      {svc('sonarr', 'Sonarr', 'tv', 'Upcoming episodes, and clean-up rules remove shows and seasons through it.', 'sonarr_mode', 'sonarr_url', 'sonarr_key', 'http://sonarr:8989')}
+      {svc('radarr', 'Radarr', 'film', 'Upcoming films (cinema, digital and disc releases), and clean-up rules remove films through it.', 'radarr_mode', 'radarr_url', 'radarr_key', 'http://radarr:7878')}
       <SubtitlesService f={f} setF={setF} run={run} status={status} live={live?.subtitles} />
       <div className="row"><button type="button" className="btn primary" onClick={save} disabled={busy}>Save changes</button></div>
     </div>

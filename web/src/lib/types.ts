@@ -72,9 +72,26 @@ export interface Settings {
   core_configured: boolean; core_registered?: boolean; title: string; date_format: string; time_format: string
   quality: string; audio_lang: string; subtitle_lang: string; subtitle_mode: 'auto' | 'always' | 'forced' | 'off'; subtitle_size: 's' | 'm' | 'l' | 'xl'
   autoplay_next: boolean; skip_intro: 'button' | 'auto' | 'off'; completion: number; history_all: boolean; upcoming_scope: 'mine' | 'all'
-  notify_url: string; notify_format: string; notify_available: boolean; notify_weekly: boolean; notify_configured: boolean
+  notify_url: string; notify_format: string; notify_available: boolean; notify_weekly: boolean; notify_leaving: boolean; notify_configured: boolean
   ai_provider: 'auto' | 'pocket' | 'openai'; ai_pocket_model: string; openai_api_key: string; openai_model: string; openai_base_url: string
-  setup_complete: boolean; base_url: string; jellyfin_url: boolean; jellyfin_public_url: string; requests: boolean; upcoming: boolean; seerr_link: string
-  seerr_url?: string; seerr_public_url?: string; seerr_key?: string; sonarr_url?: string; sonarr_key?: string; radarr_url?: string; radarr_key?: string; maintainerr_url?: string; subtitles_url?: string
-  subtitles_mode?: '' | 'core' | 'direct' | 'off'; seerr_mode?: string; sonarr_mode?: string; radarr_mode?: string; maintainerr_mode?: string; subtitles_api_url?: string; subtitles_token?: string; subtitles_mode_effective?: string
+  setup_complete: boolean; base_url: string; jellyfin_url: boolean; jellyfin_public_url: string; requests: boolean; upcoming: boolean; seerr_link: string; leaving?: number
+  seerr_url?: string; seerr_public_url?: string; seerr_key?: string; sonarr_url?: string; sonarr_key?: string; radarr_url?: string; radarr_key?: string; subtitles_url?: string
+  subtitles_mode?: '' | 'core' | 'direct' | 'off'; seerr_mode?: string; sonarr_mode?: string; radarr_mode?: string; subtitles_api_url?: string; subtitles_token?: string; subtitles_mode_effective?: string; cleanup_manual_days?: number
 }
+
+export interface CleanupCondition { field: string; op: string; value: string }
+export interface CleanupRule {
+  id: number; name: string; target: 'movie' | 'series' | 'season'; match: 'all' | 'any'; conditions: CleanupCondition[]; protect: string[]
+  grace_days: number; action: 'delete' | 'unmonitor'; exclude_lists: boolean; clear_request: boolean; active: boolean
+  last_run_at?: string; last_matched?: number; last_error?: string; reason?: string
+}
+export interface CleanupRun { at: string; matched: number; added: number; removed: number; failed: number; freed: number; people: number; error?: string; notes?: string[]; seconds: number }
+export interface CleanupOverview {
+  rules: CleanupRule[]; keeps: { item_id: string; kind: string; title: string; user_id: number; by: string; created_at: string }[]
+  log: { id: number; at: string; item_id: string; kind: string; title: string; rule: string; action: string; via: string; size: number; ok: boolean; detail: string }[]
+  last: CleanupRun | null; running: boolean; every_hours: number
+  settings: { manual_days: number; keep: 'anyone' | 'admins' }; services: { radarr: boolean; sonarr: boolean; seerr: boolean }
+}
+export interface CleanupHit { id: string; title: string; kind: string; size: number; poster?: string; protected?: string }
+export interface CleanupPreview { matches: CleanupHit[]; protected: CleanupHit[]; size: number; people: number; reason: string; notes: string[] }
+export interface LeavingEntry { title: Title; reason: string; rule?: string; manual: boolean; size: number; remove_on: string; error?: string }

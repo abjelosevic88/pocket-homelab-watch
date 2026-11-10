@@ -356,15 +356,14 @@ func (s *Server) handleTitle(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if it.Type == "Movie" || it.Type == "Series" {
-		if l := s.leavingSoon(ctx, jc); l != nil {
-			for _, x := range l {
-				if x.ID == it.ID {
-					t.Leaving = x.Leaving
-					out["title"] = t
-				}
-			}
+	if it.Type == "Movie" || it.Type == "Series" || it.Type == "Season" {
+		u := userFrom(ctx)
+		if l, err := s.store.LeavingOne(ctx, it.ID); err == nil {
+			t.Leaving = l.RemoveOn
+			out["title"] = t
+			out["leaving"] = map[string]any{"reason": l.Reason, "remove_on": l.RemoveOn, "manual": l.RuleID == 0, "size": l.Size}
 		}
+		out["can_keep"] = s.canKeep(ctx, u)
 	}
 	writeJSON(w, http.StatusOK, out)
 }

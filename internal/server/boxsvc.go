@@ -11,7 +11,7 @@ import (
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/store"
 )
 
-// ---- the box's services: Jellyseerr, Sonarr, Radarr, Maintainerr ----
+// ---- the box's services: Jellyseerr, Sonarr, Radarr ----
 //
 // On a box with Pocket Core they come from Core — addresses, keys and public
 // addresses all live there (the login Core keeps for the box owner, the account
@@ -32,10 +32,9 @@ type boxDef struct {
 }
 
 var boxDefs = map[string]boxDef{
-	"seerr":       {"jellyseerr", "Jellyseerr", true},
-	"sonarr":      {"sonarr", "Sonarr", true},
-	"radarr":      {"radarr", "Radarr", true},
-	"maintainerr": {"maintainerr", "Maintainerr", false},
+	"seerr":  {"jellyseerr", "Jellyseerr", true},
+	"sonarr": {"sonarr", "Sonarr", true},
+	"radarr": {"radarr", "Radarr", true},
 }
 
 var errBoxOff = errors.New("switched off under Settings → Services")
@@ -49,8 +48,6 @@ func boxDirect(st store.Settings, name string) (base, public, key, mode string) 
 		return st.SonarrURL, "", st.SonarrKey, st.SonarrMode
 	case "radarr":
 		return st.RadarrURL, "", st.RadarrKey, st.RadarrMode
-	case "maintainerr":
-		return st.MaintainerrURL, "", "", st.MaintainerrMode
 	}
 	return "", "", "", "off"
 }

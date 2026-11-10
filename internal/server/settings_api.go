@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json"
 
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/ai"
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/notify"
@@ -38,20 +37,24 @@ func (s *Server) publicSettings(ctx context.Context, u *store.User, st store.Set
 		"quality": st.Quality, "audio_lang": st.AudioLang, "subtitle_lang": st.SubtitleLang, "subtitle_mode": st.SubtitleMode, "subtitle_size": st.SubtitleSize,
 		"autoplay_next": st.AutoplayNext, "skip_intro": st.SkipIntro, "completion": st.Completion,
 		"history_all": st.HistoryAll, "upcoming_scope": st.UpcomingScope,
-		"notify_url": st.NotifyURL, "notify_format": st.NotifyFormat, "notify_available": st.NotifyAvailable, "notify_weekly": st.NotifyWeekly, "notify_configured": st.NotifyURL != "",
+		"notify_url": st.NotifyURL, "notify_format": st.NotifyFormat, "notify_available": st.NotifyAvailable, "notify_weekly": st.NotifyWeekly, "notify_leaving": st.NotifyLeaving, "notify_configured": st.NotifyURL != "",
 		"ai_provider": st.AIProvider, "ai_pocket_model": st.AIPocketModel, "openai_api_key": mask(st.OpenAIKey), "openai_model": st.OpenAIModel, "openai_base_url": st.OpenAIBaseURL,
 		"setup_complete": st.SetupComplete, "base_url": s.cfg.BaseURL, "jellyfin_url": s.cfg.JellyfinURL != "", "jellyfin_public_url": s.cfg.JellyfinPublicURL,
 		"requests": s.boxUp(ctx, "seerr"), "upcoming": s.boxUp(ctx, "sonarr") || s.boxUp(ctx, "radarr"),
 		"seerr_link": firstNonEmpty(st.SeerrPublicURL, st.SeerrURL),
 	}
+	if ls, err := s.store.Leaving(ctx); err == nil {
+		out["leaving"] = len(ls)
+	}
 	if u != nil && u.Role == "admin" {
 		out["seerr_url"], out["seerr_public_url"], out["seerr_key"] = st.SeerrURL, st.SeerrPublicURL, mask(st.SeerrKey)
 		out["sonarr_url"], out["sonarr_key"] = st.SonarrURL, mask(st.SonarrKey)
 		out["radarr_url"], out["radarr_key"] = st.RadarrURL, mask(st.RadarrKey)
-		out["maintainerr_url"], out["subtitles_url"] = st.MaintainerrURL, st.SubtitlesURL
+		out["subtitles_url"] = st.SubtitlesURL
 		out["subtitles_mode"], out["subtitles_api_url"], out["subtitles_token"] = st.SubtitlesMode, st.SubtitlesAPIURL, mask(st.SubtitlesToken)
 		out["subtitles_mode_effective"] = s.subsMode(st)
-		out["seerr_mode"], out["sonarr_mode"], out["radarr_mode"], out["maintainerr_mode"] = st.SeerrMode, st.SonarrMode, st.RadarrMode, st.MaintainerrMode
+		out["cleanup_manual_days"] = st.CleanupManualDays
+		out["seerr_mode"], out["sonarr_mode"], out["radarr_mode"] = st.SeerrMode, st.SonarrMode, st.RadarrMode
 	}
 	return out
 }
@@ -141,6 +144,7 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	boolIn("notify_available", &cur.NotifyAvailable, in.NotifyAvailable)
 	boolIn("notify_weekly", &cur.NotifyWeekly, in.NotifyWeekly)
+	boolIn("notify_leaving", &cur.NotifyLeaving, in.NotifyLeaving)
 	// the box's services: admins only, silently ignored for everyone else
 	boxChanged := false
 	if isAdmin {
@@ -152,21 +156,16 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		secret("sonarr_key", &cur.SonarrKey, in.SonarrKey)
 		url("radarr_url", &cur.RadarrURL, in.RadarrURL)
 		secret("radarr_key", &cur.RadarrKey, in.RadarrKey)
-		url("maintainerr_url", &cur.MaintainerrURL, in.MaintainerrURL)
 		url("subtitles_url", &cur.SubtitlesURL, in.SubtitlesURL)
 		oneOf("subtitles_mode", &cur.SubtitlesMode, in.SubtitlesMode, "", "core", "direct", "off")
 		oneOf("seerr_mode", &cur.SeerrMode, in.SeerrMode, "", "core", "direct", "off")
 		oneOf("sonarr_mode", &cur.SonarrMode, in.SonarrMode, "", "core", "direct", "off")
 		oneOf("radarr_mode", &cur.RadarrMode, in.RadarrMode, "", "core", "direct", "off")
-		oneOf("maintainerr_mode", &cur.MaintainerrMode, in.MaintainerrMode, "", "core", "direct", "off")
 		url("subtitles_api_url", &cur.SubtitlesAPIURL, in.SubtitlesAPIURL)
 		secret("subtitles_token", &cur.SubtitlesToken, in.SubtitlesToken)
 		boxChanged = before != cur
 		if boxChanged {
 			forgetBoxServices()
-		}
-		if before.MaintainerrURL != cur.MaintainerrURL {
-			_ = s.store.CacheDelete(r.Context(), "maintainerr:")
 		}
 	}
 	if keys["ai_provider"] {
@@ -255,7 +254,7 @@ func (s *Server) handleIntegrationTest(w http.ResponseWriter, r *http.Request) {
 				msg = "Pocket Subtitles answers " + how + " (" + me.Email + ")"
 			}
 		}
-	case "seerr", "sonarr", "radarr", "maintainerr":
+	case "seerr", "sonarr", "radarr":
 		if u.Role != "admin" {
 			writeErr(w, http.StatusForbidden, "only an admin can do that")
 			return
@@ -291,15 +290,6 @@ func (s *Server) handleIntegrationTest(w http.ResponseWriter, r *http.Request) {
 			}
 			if err = s.arrGet(ctx, target.base, target.key, "/system/status", nil, &st); err == nil {
 				msg = fmt.Sprintf("%s %s answers%s", firstNonEmpty(st.AppName, in.Which), st.Version, how)
-			}
-		case "maintainerr":
-			var cols []json.RawMessage
-			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, target.base+"/api/collections", nil)
-			var res *http.Response
-			if res, err = s.http.Do(req); err == nil {
-				err = json.NewDecoder(res.Body).Decode(&cols)
-				res.Body.Close()
-				msg = fmt.Sprintf("Maintainerr answers: %d collections%s", len(cols), how)
 			}
 		}
 	case "openai":

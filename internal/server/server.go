@@ -34,7 +34,7 @@ type Server struct {
 	started  time.Time
 	requests atomic.Int64
 	errors   atomic.Int64
-	http     *http.Client // Jellyseerr, Sonarr, Radarr, Maintainerr
+	http     *http.Client // Jellyseerr, Sonarr, Radarr
 
 	oidcMu sync.Mutex
 	oidc   *oidcProvider // for the issuer in use; rebuilt when it changes
@@ -113,6 +113,7 @@ func (s *Server) Bootstrap(ctx context.Context) error {
 	}
 	_ = s.store.PurgeSessions(ctx)
 	go s.janitor(ctx)
+	go s.cleanupLoop(ctx)
 	if s.cfg.JellyfinBundled != "" {
 		if s.openKV(ctx, kvBundledAdmin) != "" {
 			s.bundled.on.Store(true) // set up by this app before
@@ -151,7 +152,6 @@ func (s *Server) seedBox(ctx context.Context) error {
 	set("sonarr_key", &st.SonarrKey, s.cfg.SonarrKey)
 	set("radarr_url", &st.RadarrURL, s.cfg.RadarrURL)
 	set("radarr_key", &st.RadarrKey, s.cfg.RadarrKey)
-	set("maintainerr_url", &st.MaintainerrURL, s.cfg.MaintainerrURL)
 	set("subtitles_url", &st.SubtitlesURL, s.cfg.SubtitlesPublicURL)
 	set("subtitles_api_url", &st.SubtitlesAPIURL, s.cfg.SubtitlesURL)
 	set("subtitles_token", &st.SubtitlesToken, s.cfg.SubtitlesToken)
@@ -356,7 +356,7 @@ var eventTopics = []string{"watch.watched", "watch.requested", "watch.request_av
 func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "watch", Name: "Pocket Watch",
-		Description: "Films and shows for the whole household: Jellyfin underneath, with a fast player, continue watching and next up, a watch history it owns with stats, a watchlist, requests through Jellyseerr that tell you when they arrive, upcoming episodes, and \"what should we watch tonight?\" with AI.",
+		Description: "Films and shows for the whole household: Jellyfin underneath, with a fast player, continue watching and next up, a watch history it owns with stats, a watchlist, requests through Jellyseerr that tell you when they arrive, upcoming episodes, clean-up rules with a Leaving soon shelf, and \"what should we watch tonight?\" with AI.",
 		Icon:        "/favicon.svg", Version: Version,
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "WATCH",
 		Publishes: eventTopics,
@@ -366,9 +366,8 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 		Services: []core.ServiceUse{
 			{Type: "jellyfin", Reason: "Your films and shows: Pocket Watch plays them with your own Jellyfin account, so resume points and watched marks stay yours"},
 			{Type: "jellyseerr", Reason: "Discover and requests (the box owner's login; each person requests as their own Jellyseerr user)"},
-			{Type: "sonarr", Reason: "Upcoming episodes (reads the calendar)"},
-			{Type: "radarr", Reason: "Upcoming films (reads the calendar)"},
-			{Type: "maintainerr", Reason: "Leaving soon: what a cleanup rule will remove"},
+			{Type: "sonarr", Reason: "Upcoming episodes, and clean-up rules: removes the shows and seasons a rule picks"},
+			{Type: "radarr", Reason: "Upcoming films, and clean-up rules: removes the films a rule picks"},
 		},
 	}
 	if s.cfg.BaseURL != "" {

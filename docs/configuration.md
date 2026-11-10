@@ -62,9 +62,9 @@ the variables below and Settings → Services, for a box without Core.
 |---|---|---|
 | `JELLYSEERR_URL` / `JELLYSEERR_API_KEY` | – | Discover, requests, arrivals. A person's Jellyseerr user is the one linked to their Jellyfin account; one without gets it imported from Jellyfin on their first request. |
 | `JELLYSEERR_PUBLIC_URL` | – | What a browser opens for "Open in Jellyseerr" |
-| `SONARR_URL` / `SONARR_API_KEY` | – | Upcoming episodes (only the calendar is read) |
-| `RADARR_URL` / `RADARR_API_KEY` | – | Upcoming films: cinema, digital and disc releases |
-| `MAINTAINERR_URL` | – | "Leaving soon": titles a Maintainerr collection will remove, with the day |
+| `SONARR_URL` / `SONARR_API_KEY` | – | Upcoming episodes; clean-up rules remove shows and seasons through it |
+| `RADARR_URL` / `RADARR_API_KEY` | – | Upcoming films (cinema, digital and disc releases); clean-up rules remove films through it |
+| `CLEANUP_EVERY` | `6h` | How often the clean-up rules run (Settings → Clean-up) |
 | `SUBTITLES_URL` / `SUBTITLES_API_TOKEN` | – | [Pocket Subtitles](https://github.com/abjelosevic88/pocket-homelab-subtitles)' API and a token from it: the player saves a subtitle's timing into the .srt for everyone. Without a token, Watch goes through Pocket Core as each person (app link `subtitles:sync`, switched on in Core → Links). Settings → Services can choose. |
 | `SUBTITLES_PUBLIC_URL` | – | Pocket Subtitles' address in a browser: admins get a link to the file from the player |
 

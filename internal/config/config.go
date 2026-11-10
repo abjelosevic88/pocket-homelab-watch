@@ -60,7 +60,8 @@ type Config struct {
 
 	// Box-wide services an admin sets once (also editable under Settings):
 	// requests go to Jellyseerr as each person's own Jellyseerr user, upcoming
-	// episodes and films come from Sonarr and Radarr, "leaving soon" from Maintainerr.
+	// episodes and films come from Sonarr and Radarr, and clean-up rules remove
+	// titles through them.
 	JellyseerrURL       string
 	JellyseerrPublicURL string
 	JellyseerrKey       string
@@ -68,7 +69,6 @@ type Config struct {
 	SonarrKey           string
 	RadarrURL           string
 	RadarrKey           string
-	MaintainerrURL      string
 	// Pocket Subtitles: the player saves a subtitle's timing into the file through it
 	// (as the person via a Pocket Core link, or with this box's token), and admins get
 	// a link to its nudge page.
@@ -86,6 +86,8 @@ type Config struct {
 
 	// How often each person's watch history is read from Jellyfin.
 	SyncEvery time.Duration
+	// How often the clean-up rules run (Settings → Clean-up).
+	CleanupEvery time.Duration
 
 	// Outbound lookups identify as this.
 	UserAgent string
@@ -188,7 +190,6 @@ func Load() (*Config, error) {
 		SonarrKey:           env("SONARR_API_KEY", ""),
 		RadarrURL:           strings.TrimRight(env("RADARR_URL", ""), "/"),
 		RadarrKey:           env("RADARR_API_KEY", ""),
-		MaintainerrURL:      strings.TrimRight(env("MAINTAINERR_URL", ""), "/"),
 		SubtitlesURL:        strings.TrimRight(env("SUBTITLES_URL", ""), "/"),
 		SubtitlesToken:      env("SUBTITLES_API_TOKEN", ""),
 		SubtitlesPublicURL:  strings.TrimRight(env("SUBTITLES_PUBLIC_URL", ""), "/"),
@@ -199,6 +200,7 @@ func Load() (*Config, error) {
 		OpenAIModel:   env("OPENAI_MODEL", ""),
 		OpenAIBaseURL: strings.TrimRight(env("OPENAI_BASE_URL", ""), "/"),
 		SyncEvery:     envDuration("SYNC_EVERY", 10*time.Minute),
+		CleanupEvery:  envDuration("CLEANUP_EVERY", 6*time.Hour),
 
 		UserAgent: env("USER_AGENT", "PocketWatch/1.0 (+https://github.com/abjelosevic88/pocket-homelab-watch)"),
 

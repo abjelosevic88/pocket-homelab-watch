@@ -28,9 +28,10 @@ they share resume points and watched marks with Pocket Watch because both act as
 Everyone signs in to Pocket Watch with their own account and watches with **their own** Jellyfin account: a token
 from signing in once (password or Quick Connect — the password itself is never kept), or the login Pocket Core
 holds for them. History, watchlist, followed requests and settings are keyed by person; another person's ids
-answer 404 and admins get no read access to anyone's watching. The box's services (Jellyseerr, Sonarr, Radarr,
-Maintainerr) are configured once by an admin, and Pocket Watch only ever uses them *as the person*: requests go in
-as their own Jellyseerr user, and they only see their own.
+answer 404 and admins get no read access to anyone's watching. The box's services (Jellyseerr, Sonarr,
+Radarr) are configured once by an admin, and Pocket Watch only ever uses them *as the person*: requests go in
+as their own Jellyseerr user, and they only see their own. Clean-up rules are the one box-wide exception: an admin's
+rules count everyone's watched marks (only whether, never what else), and removals go through Radarr/Sonarr.
 
 ## Playing
 

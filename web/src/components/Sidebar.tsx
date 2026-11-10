@@ -15,6 +15,7 @@ export function Sidebar({ onCreate, onNavigate }: { onCreate: (k: CreateKind) =>
   const LIBRARY: NavItem[] = [
     { to: '/films', label: 'Films', icon: 'film' },
     { to: '/shows', label: 'Shows', icon: 'tv' },
+    ...(settings?.leaving ? [{ to: '/leaving', label: 'Leaving soon', icon: 'hourglass' }] : []),
   ]
   const YOURS: NavItem[] = [
     { to: '/watchlist', label: 'Watchlist', icon: 'bookmark' },

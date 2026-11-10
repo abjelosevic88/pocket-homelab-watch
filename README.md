@@ -72,7 +72,7 @@ The same [docker-compose.yml](docker-compose.yml) does both: the bundled Jellyfi
 
 **Watching**
 - Home: pick up where you left off, the next episode of every show you're on, new episodes and films, picks from
-  your own shelves for today, “because you watched…”, what’s leaving soon.
+  your own shelves for today, “because you watched…”, what’s leaving soon (from your own clean-up rules).
 - Films and shows with filters (unwatched, started, favourites, genre, decade) and sorting; a page for every film,
   show, season, episode and person, with cast, trailers and “more like this”.
 - A player that plays the file as it is whenever the browser can (no transcoding), and asks Jellyfin for HLS when
@@ -160,7 +160,23 @@ Switching an install later: to move from the included Jellyfin to yours, remove 
 
 ### Box services
 
-An admin adds Jellyseerr, Sonarr, Radarr and Maintainerr under Settings → Services (or they come from Pocket Core).
+An admin adds Jellyseerr, Sonarr and Radarr under Settings → Services (or they come from Pocket Core).
+
+### Clean-up rules
+
+Settings → Clean-up (admins) replaces a separate Maintainerr. A rule looks at films, shows or seasons and picks what
+passes its conditions: watched by everyone / someone / nobody, added or last watched more or less than N days ago,
+asked for in Jellyseerr and watched by whoever asked, rating, size on disk, release year, genre, show ended. Titles on
+someone's watchlist, half-watched (in the last six months) or a favourite are protected unless the rule says otherwise.
+**Preview** shows what a rule would pick right now and how much space that is.
+
+What a rule picks goes on **Leaving soon** (Home, the sidebar, each title's page) for the rule's grace days; anyone
+can press **Keep** (or only admins, a choice), and whoever requested the title gets a push. After that it is removed
+through Radarr or Sonarr — with its files, or only the files with the title left unmonitored; seasons lose their files
+and stop being fetched — then cleared in Jellyseerr so it can be asked for again. Titles neither has are deleted
+through Jellyfin (the owner's account needs permission to delete media). Admins can also remove any title by hand
+from its page, now or after a few days on Leaving soon. Rules run every `CLEANUP_EVERY` (6 h) or on **Run now**;
+the log keeps what was removed and how much space it freed.
 
 Try it with a demo library: [scripts/demo-library/make.sh](scripts/demo-library/make.sh) runs a throwaway Jellyfin
 with Blender open movies, silent-era public-domain films and three old or Creative Commons series (generated

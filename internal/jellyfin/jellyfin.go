@@ -529,6 +529,11 @@ func (c *Client) Items(ctx context.Context, q url.Values) (*Items, error) {
 	return &out, c.do(ctx, http.MethodGet, "/Items", q, nil, &out)
 }
 
+// DeleteItem deletes an item and its files (the account must be allowed to delete media).
+func (c *Client) DeleteItem(ctx context.Context, id string) error {
+	return c.do(ctx, http.MethodDelete, "/Items/"+url.PathEscape(id), nil, nil, nil)
+}
+
 // Item reads one item with everything about it.
 func (c *Client) Item(ctx context.Context, id string) (*Item, error) {
 	var it Item
