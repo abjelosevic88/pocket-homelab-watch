@@ -81,6 +81,7 @@ the variables below and Settings → Services, for a box without Core.
 |---|---|---|
 | `CORE_URL` / `CORE_REGISTRATION_KEY` | – | [Pocket Core](https://github.com/abjelosevic88/pocket-homelab-core): register on start (the key is needed once; the app token is kept in `$DATA_DIR/core.token`), "Sign in with Pocket Core", accept the tokens Core gives paired phones, get each person's Jellyfin login from Core, use Pocket AI, publish events, offer `watching:read` and `requests:write` to other Pocket apps |
 | `CORE_APP_URL` | `BASE_URL` | How Core reaches this app for health checks (e.g. `http://host.docker.internal:8201`) |
+| `CORE_PUBLIC_URL` | Core's sign-in address | Pocket Core's address in the browser, for links such as "Finish Downloads setup" (e.g. `https://core.example.com`) |
 
 With `CORE_URL` empty the app behaves exactly as a standalone app: every Core-only choice stays visible, greyed out
 with a note.

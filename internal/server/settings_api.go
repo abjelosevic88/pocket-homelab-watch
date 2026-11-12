@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/ai"
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/notify"
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/store"

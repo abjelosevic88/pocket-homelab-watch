@@ -97,6 +97,7 @@ type Config struct {
 	CoreURL             string
 	CoreRegistrationKey string
 	CoreAppURL          string // how Core reaches this app; defaults to BASE_URL
+	CorePublicURL       string // what a browser opens for Core (else the issuer Core registered us with)
 
 	DemoData bool
 }
@@ -207,6 +208,7 @@ func Load() (*Config, error) {
 		CoreURL:             strings.TrimRight(env("CORE_URL", ""), "/"),
 		CoreRegistrationKey: env("CORE_REGISTRATION_KEY", ""),
 		CoreAppURL:          strings.TrimRight(env("CORE_APP_URL", ""), "/"),
+		CorePublicURL:       strings.TrimRight(env("CORE_PUBLIC_URL", ""), "/"),
 
 		DemoData: envBool("DEMO_DATA", false),
 	}

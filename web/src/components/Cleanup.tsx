@@ -89,7 +89,7 @@ export function Cleanup() {
             {(['radarr', 'sonarr', 'seerr'] as const).map(k => <span key={k} className={`badge ${o.services[k] ? 'ok' : ''}`}>{{ radarr: 'Radarr', sonarr: 'Sonarr', seerr: 'Jellyseerr' }[k]}{o.services[k] ? '' : ': not connected'}</span>)}
             <Link to="/settings/services" className="muted small">Services</Link>
           </p>
-          {noArr && <p className="callout warn small"><Icon name="alert" size={14} />Neither Radarr nor Sonarr is connected, so titles are deleted through Jellyfin. The owner’s Jellyfin account must be allowed to delete media.</p>}
+          {noArr && <p className="callout warn small"><Icon name="alert" size={14} /><span>Neither Radarr nor Sonarr is connected, so titles are deleted through Jellyfin. The owner’s Jellyfin account must be allowed to delete media.{o.setup_url && <> <a href={o.setup_url}>Finish Downloads setup →</a></>}</span></p>}
           {last ? (
             <p className={`small ${last.error ? 'bad' : 'muted'}`}>
               Last run {fmtDateTime(last.at)}: {last.error ? last.error : <>{last.matched} on Leaving soon ({last.added} new), {last.removed} removed{last.freed ? `, ${fmtBytes(last.freed)} freed` : ''}{last.failed ? `, ${last.failed} failed` : ''} · {last.people} {last.people === 1 ? 'person' : 'people'} counted</>}

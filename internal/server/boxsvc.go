@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	core "github.com/abjelosevic88/pocket-homelab-core/sdk"
 	"github.com/abjelosevic88/pocket-homelab-watch/internal/store"
 )
 
@@ -38,6 +39,17 @@ var boxDefs = map[string]boxDef{
 }
 
 var errBoxOff = errors.New("switched off under Settings → Services")
+
+// errNotSetUp: the box simply doesn't have the service yet (no address here,
+// Core has none, or no login for the owner) — a calm "not set up", not a fault.
+type errNotSetUp struct{ msg string }
+
+func (e *errNotSetUp) Error() string { return e.msg }
+
+func notSetUp(err error) bool {
+	var n *errNotSetUp
+	return errors.As(err, &n)
+}
 
 // direct is the address, public address, key and mode saved for a service.
 func boxDirect(st store.Settings, name string) (base, public, key, mode string) {
@@ -93,13 +105,13 @@ func (s *Server) resolveBoxService(ctx context.Context, name string) (*boxSvc, e
 	base, public, key, mode := boxDirect(st, name)
 	direct := func() (*boxSvc, error) {
 		if base == "" || (def.needsKey && key == "") {
-			return nil, errors.New("not set up: add it in Pocket Core or enter its address" + map[bool]string{true: " and key", false: ""}[def.needsKey] + " under Settings → Services")
+			return nil, &errNotSetUp{"not set up: add it in Pocket Core or enter its address" + map[bool]string{true: " and key", false: ""}[def.needsKey] + " under Settings → Services"}
 		}
 		return &boxSvc{base: strings.TrimRight(base, "/"), public: strings.TrimRight(firstNonEmpty(public, base), "/"), key: key, via: "direct"}, nil
 	}
 	viaCore := func() (*boxSvc, error) {
 		if !s.core.Configured() {
-			return nil, errors.New("there is no Pocket Core on this box")
+			return nil, &errNotSetUp{"there is no Pocket Core on this box"}
 		}
 		owner, err := s.store.GetUser(ctx, s.store.OwnerID(ctx))
 		if err != nil {
@@ -107,10 +119,14 @@ func (s *Server) resolveBoxService(ctx context.Context, name string) (*boxSvc, e
 		}
 		cred, err := s.core.ServiceFor(ctx, owner.Email, def.typ)
 		if err != nil {
+			var le *core.LinkError
+			if errors.As(err, &le) && (le.Reason == "target_missing" || le.Reason == "no_account") {
+				return nil, &errNotSetUp{coreReason(err, def.name)}
+			}
 			return nil, errors.New(coreReason(err, def.name))
 		}
 		if cred.URL == "" || (def.needsKey && cred.Key == "") {
-			return nil, errors.New("Pocket Core has " + def.name + " without a login for the box owner (Pocket Core → Settings → My logins)")
+			return nil, &errNotSetUp{"Pocket Core has " + def.name + " without a login for the box owner (Pocket Core → Settings → My logins)"}
 		}
 		return &boxSvc{base: strings.TrimRight(cred.URL, "/"), public: strings.TrimRight(firstNonEmpty(cred.PublicURL, cred.URL), "/"), key: cred.Key, via: "core"}, nil
 	}
@@ -157,6 +173,38 @@ func (s *Server) handleServicesStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	out["subtitles"] = sv
 	writeJSON(w, http.StatusOK, out)
+}
+
+// coreUsed says whether a service would come from Pocket Core (Automatic with a Core, or Core).
+func (s *Server) coreUsed(ctx context.Context, name string) bool {
+	st, _ := s.store.GetSettings(ctx, 0)
+	_, _, _, mode := boxDirect(st, name)
+	return mode == "core" || ((mode == "" || mode == "auto") && s.core.Configured())
+}
+
+// corePublicURL is Pocket Core's address in a browser: CORE_PUBLIC_URL, else
+// the issuer Core registered this app with, else CORE_URL ("" without Core).
+func (s *Server) corePublicURL() string {
+	if !s.core.Configured() {
+		return ""
+	}
+	return strings.TrimRight(firstNonEmpty(s.cfg.CorePublicURL, s.core.OIDC().Issuer, s.cfg.CoreURL), "/")
+}
+
+// downloadsSetup says where an admin finishes setting up the box's film and
+// show downloads: Pocket Core's Downloads settings when the services come from
+// Core, else "" (the app's own Settings → Services). Admin is whom others ask.
+func (s *Server) downloadsSetup(ctx context.Context, names ...string) (url, admin string) {
+	for _, n := range names {
+		if c := s.corePublicURL(); c != "" && s.coreUsed(ctx, n) {
+			url = c + "/settings/system#downloads"
+			break
+		}
+	}
+	if owner, err := s.store.GetUser(ctx, s.store.OwnerID(ctx)); err == nil {
+		admin = firstNonEmpty(owner.Name, owner.Email)
+	}
+	return url, admin
 }
 
 // boxUp reports whether a service is reachable for Watch right now (cached).

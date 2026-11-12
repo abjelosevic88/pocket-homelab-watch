@@ -77,8 +77,26 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 	st, _ := s.store.GetSettings(ctx, u.ID)
 	son, sonErr := s.boxService(ctx, "sonarr")
 	rad, radErr := s.boxService(ctx, "radarr")
+	// what isn't set up yet is a calm note with where to finish it, not a fault
+	var missing, problems []string
+	for _, x := range []struct {
+		name, label string
+		err         error
+	}{{"sonarr", "Sonarr", sonErr}, {"radarr", "Radarr", radErr}} {
+		switch {
+		case x.err == nil, errors.Is(x.err, errBoxOff):
+		case notSetUp(x.err):
+			missing = append(missing, x.name)
+		default:
+			problems = append(problems, x.label+": "+x.err.Error())
+		}
+	}
+	setup := map[string]any{"missing": nz(missing)}
+	if len(missing) > 0 {
+		setup["setup_url"], setup["admin"] = s.downloadsSetup(ctx, missing...)
+	}
 	if son == nil && rad == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"items": []Upcoming{}, "configured": false})
+		writeJSON(w, http.StatusOK, map[string]any{"items": []Upcoming{}, "configured": false, "problems": nz(problems), "setup": setup})
 		return
 	}
 	days := queryInt(r, "days")
@@ -128,13 +146,6 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var out []Upcoming
-	var problems []string
-	if sonErr != nil && !errors.Is(sonErr, errBoxOff) && !strings.HasPrefix(sonErr.Error(), "not set up") {
-		problems = append(problems, "Sonarr: "+sonErr.Error())
-	}
-	if radErr != nil && !errors.Is(radErr, errBoxOff) && !strings.HasPrefix(radErr.Error(), "not set up") {
-		problems = append(problems, "Radarr: "+radErr.Error())
-	}
 	if son != nil {
 		var eps []struct {
 			Title         string `json:"title"`
@@ -202,5 +213,5 @@ func (s *Server) handleUpcoming(w http.ResponseWriter, r *http.Request) {
 		}
 		return out[i].Series+out[i].Title < out[j].Series+out[j].Title
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"items": nz(out), "configured": true, "scope": scope, "problems": nz(problems)})
+	writeJSON(w, http.StatusOK, map[string]any{"items": nz(out), "configured": true, "scope": scope, "problems": nz(problems), "setup": setup})
 }

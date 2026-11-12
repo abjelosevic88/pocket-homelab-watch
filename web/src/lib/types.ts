@@ -90,7 +90,7 @@ export interface CleanupOverview {
   rules: CleanupRule[]; keeps: { item_id: string; kind: string; title: string; user_id: number; by: string; created_at: string }[]
   log: { id: number; at: string; item_id: string; kind: string; title: string; rule: string; action: string; via: string; size: number; ok: boolean; detail: string }[]
   last: CleanupRun | null; running: boolean; every_hours: number
-  settings: { manual_days: number; keep: 'anyone' | 'admins' }; services: { radarr: boolean; sonarr: boolean; seerr: boolean }
+  settings: { manual_days: number; keep: 'anyone' | 'admins' }; services: { radarr: boolean; sonarr: boolean; seerr: boolean }; setup_url?: string
 }
 export interface CleanupHit { id: string; title: string; kind: string; size: number; poster?: string; protected?: string }
 export interface CleanupPreview { matches: CleanupHit[]; protected: CleanupHit[]; size: number; people: number; reason: string; notes: string[] }

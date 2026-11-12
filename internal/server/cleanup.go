@@ -1247,11 +1247,18 @@ func (s *Server) handleCleanup(w http.ResponseWriter, r *http.Request) {
 	for i := range rules {
 		ro = append(ro, ruleOut{rules[i], describe(&rules[i])})
 	}
+	_, radErr := s.boxService(ctx, "radarr")
+	_, sonErr := s.boxService(ctx, "sonarr")
+	setupURL := "" // neither is set up yet: where to finish the box's downloads
+	if notSetUp(radErr) && notSetUp(sonErr) {
+		setupURL, _ = s.downloadsSetup(ctx, "radarr", "sonarr")
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"rules": ro, "keeps": ko, "log": logs, "last": s.cleanupLast(ctx), "running": running,
 		"every_hours": s.cleanupEvery().Hours(),
 		"settings":    map[string]any{"manual_days": st.CleanupManualDays, "keep": firstNonEmpty(st.CleanupKeep, "anyone")},
-		"services":    map[string]bool{"radarr": s.boxUp(ctx, "radarr"), "sonarr": s.boxUp(ctx, "sonarr"), "seerr": s.boxUp(ctx, "seerr")},
+		"services":    map[string]bool{"radarr": radErr == nil, "sonarr": sonErr == nil, "seerr": s.boxUp(ctx, "seerr")},
+		"setup_url":   setupURL,
 	})
 }
 
