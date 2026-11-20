@@ -103,6 +103,8 @@ Watch uses `subtitles:sync` in Pocket Subtitles (saving subtitle timing as the p
 | `watching:read` | `GET /dashboard`, `/history`, `/stats`, `/upcoming`, `/day/{date}`, images |
 | `requests:write` | `GET /search`, `/watchlist`, `/requests`, `/discover…`; `POST /watchlist`, `POST /requests` |
 
+Pocket Move can copy your watch history and watchlist out and bring them in: `move:export` reads `GET /export.json` (`kind: pocket`), `move:import` posts it to `POST /import` (adds, never deletes; a second run adds nothing). `GET /pocket/portable` describes both.
+
 Events published on the Core bus (each with `user_email`): `watch.watched` (a film or episode finished, here or in
 another Jellyfin app — `elsewhere: true`), `watch.requested`, `watch.request_available`, `watch.watchlist_added`.
 

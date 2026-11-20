@@ -384,11 +384,15 @@ func (s *Server) handleImportJSON(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	counts["watches"] = n
+	// a title already on the list is kept as it is, and not counted
+	before, _ := s.store.Watchlist(ctx, uid)
 	for _, x := range doc.Watchlist {
 		x.ID = 0
-		if (x.ItemID != "" || x.TMDBID > 0) && s.store.AddToWatchlist(ctx, uid, &x) == nil {
-			counts["watchlist"]++
+		if x.ItemID != "" || x.TMDBID > 0 {
+			_ = s.store.AddToWatchlist(ctx, uid, &x)
 		}
 	}
+	after, _ := s.store.Watchlist(ctx, uid)
+	counts["watchlist"] = len(after) - len(before)
 	writeJSON(w, http.StatusOK, counts)
 }

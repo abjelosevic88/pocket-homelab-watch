@@ -361,6 +361,7 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "WATCH",
 		Publishes: eventTopics,
 		Offers:    linkOffers,
+		Portable:  portable,
 		Uses: []core.Use{core.InferenceUse(),
 			{App: "subtitles", Scopes: []string{"subtitles:sync"}, Reason: "Save a subtitle's timing into the file when you fix it while watching, so everyone gets it"}},
 		Services: []core.ServiceUse{
