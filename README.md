@@ -104,6 +104,9 @@ The same [docker-compose.yml](docker-compose.yml) does both: the bundled Jellyfi
 - One sign-in; each person’s Jellyfin login can come from Core — nothing to paste.
 - Pocket Day can write “what you watched” into your journal (`watching:read`); other apps can put titles on your
   watchlist or request them (`requests:write`); events for finished titles, requests and arrivals.
+- Pocket Search finds the films, shows and episodes in your library (`!watch`, `!film`, `!series`), Pocket Day can
+  read what you watched on a day and Pocket Hub shows what to continue (`pocket:search`, `pocket:day`,
+  `pocket:widget`). Each of them only reads, and only your own watching; none of them requests a title.
 - Strictly per person: history, watchlist, requests and settings are yours; admins don’t see anyone else’s watching.
 
 ## Run it

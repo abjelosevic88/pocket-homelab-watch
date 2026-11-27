@@ -105,6 +105,19 @@ Watch uses `subtitles:sync` in Pocket Subtitles (saving subtitle timing as the p
 
 Pocket Move can copy your watch history and watchlist out and bring them in: `move:export` reads `GET /export.json` (`kind: pocket`), `move:import` posts it to `POST /import` (adds, never deletes; a second run adds nothing). `GET /pocket/portable` describes both.
 
+### For Pocket Search, Pocket Day and Pocket Hub
+
+Pocket Watch says in its manifest what the apps that bring the box together may ask it (shelf `Media`), and answers
+in the shape every Pocket app uses ([capabilities](https://github.com/abjelosevic88/pocket-homelab-core/blob/main/docs/capabilities.md)).
+A person signed in here can call the same routes. None of them requests, downloads or removes a title, starts
+playback or runs a clean-up rule.
+
+| | |
+|---|---|
+| `GET /pocket/search?q=&limit=` | Films, shows and episodes in your library by title, the best match first: `{"items":[{"id":"film:…\|series:…\|episode:…","title","snippet","kind","date","url","score"}]}`. The line is the year, the length and watched or how far (`2024 · 2h 46m · 40% watched`); a show's years, episodes and how many are left; an episode's show and number first. The same Jellyfin lookup as `GET /search`, with your own account, but only the library: no people, and nothing that could be requested (that stays behind `requests:write`). No Jellyfin account answers an empty list |
+| `GET /pocket/day/{YYYY-MM-DD}?tz=<IANA zone>` | The films and episodes watched that day, one item each: `{"date","summary","items":[{"id","time","title","sub","kind","minutes","done","url","image"}],"metrics"}` — `sub` is the show and number (`Severance · S02E05`), `minutes` the time it got, `done` when finished, `time` when it was last watched. The summary reads like "Watched 2 episodes of Severance and a film". The same day as `GET /day/{date}` unless the zone keeps another clock than the server's. Read from the history kept here, never from Jellyfin |
+| `GET /pocket/widget` | Continue watching and the next episode of your shows, the most recently watched first (`detail`: time left, or the next episode), then what was added lately; each show once: `{"line","items":[{"id","title","detail","url"}],"url"}`. The line says what plays in Pocket Watch right now, and is empty otherwise. Read from Jellyfin as the start page reads it, with your own account, and kept for three minutes per person. No Jellyfin account: nothing to show |
+
 Events published on the Core bus (each with `user_email`): `watch.watched` (a film or episode finished, here or in
 another Jellyfin app — `elsewhere: true`), `watch.requested`, `watch.request_available`, `watch.watchlist_added`.
 

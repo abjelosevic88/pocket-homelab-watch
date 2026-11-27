@@ -194,6 +194,26 @@ func (s *Store) Watches(ctx context.Context, uid int64, f WatchFilter) ([]Watch,
 	return out, total, rows.Err()
 }
 
+// WatchesBetween lists a person's rows last watched in [from, to), newest
+// first, at most limit. from and to are UTC "2006-01-02T15:04:05" (no zone,
+// so they sort before any time stamp of that second).
+func (s *Store) WatchesBetween(ctx context.Context, uid int64, from, to string, limit int) ([]Watch, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+watchCols+` FROM watches WHERE user_id = ? AND watched_at >= ? AND watched_at < ? ORDER BY watched_at DESC LIMIT ?`, uid, from, to, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []Watch{}
+	for rows.Next() {
+		x, err := scanWatch(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 // DeleteWatch removes one row of a person's history.
 func (s *Store) DeleteWatch(ctx context.Context, uid, id int64) error {
 	res, err := s.DB.ExecContext(ctx, `DELETE FROM watches WHERE user_id = ? AND id = ?`, uid, id)

@@ -453,11 +453,20 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"movies": []Title{}, "series": []Title{}, "episodes": []Title{}, "people": []Title{}})
 		return
 	}
-	ctx := r.Context()
-	out := map[string]any{}
+	writeJSON(w, http.StatusOK, searchLibrary(r.Context(), jc, q, "movies", "series", "episodes", "people"))
+}
+
+// searchTypes are the lists GET /search answers with, and the Jellyfin type behind each.
+var searchTypes = map[string]string{"movies": "Movie", "series": "Series", "episodes": "Episode", "people": "Person"}
+
+// searchLibrary looks the words up in the person's library, one list per
+// key of searchTypes, side by side; a list Jellyfin does not answer stays empty.
+func searchLibrary(ctx context.Context, jc *jfConn, q string, keys ...string) map[string][]Title {
+	out := map[string][]Title{}
 	var mu sync.Mutex
 	var wg sync.WaitGroup
-	for key, typ := range map[string]string{"movies": "Movie", "series": "Series", "episodes": "Episode", "people": "Person"} {
+	for _, key := range keys {
+		typ := searchTypes[key]
 		wg.Add(1)
 		go func(key, typ string) {
 			defer wg.Done()
@@ -476,7 +485,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}(key, typ)
 	}
 	wg.Wait()
-	writeJSON(w, http.StatusOK, out)
+	return out
 }
 
 // ---- images ----

@@ -357,11 +357,12 @@ func (s *Server) registerWithCore(ctx context.Context) error {
 	m := core.Manifest{
 		Slug: "watch", Name: "Pocket Watch",
 		Description: "Films and shows for the whole household: Jellyfin underneath, with a fast player, continue watching and next up, a watch history it owns with stats, a watchlist, requests through Jellyseerr that tell you when they arrive, upcoming episodes, clean-up rules with a Leaving soon shelf, and \"what should we watch tonight?\" with AI.",
-		Icon:        "/favicon.svg", Version: Version,
+		Icon:        "/favicon.svg", Version: Version, Category: "Media",
 		URL: s.cfg.CoreAppURL, PublicURL: s.cfg.BaseURL, HealthPath: "/healthz", EnvPrefix: "WATCH",
-		Publishes: eventTopics,
-		Offers:    linkOffers,
-		Portable:  portable,
+		Publishes:    eventTopics,
+		Offers:       linkOffers,
+		Portable:     portable,
+		Capabilities: capabilities,
 		Uses: []core.Use{core.InferenceUse(),
 			{App: "subtitles", Scopes: []string{"subtitles:sync"}, Reason: "Save a subtitle's timing into the file when you fix it while watching, so everyone gets it"}},
 		Services: []core.ServiceUse{
